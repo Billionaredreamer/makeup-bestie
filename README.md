@@ -24,7 +24,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Add the key only to `.env.local` as `OPENAI_API_KEY`. Never use a `NEXT_PUBLIC_` prefix. `.env*` is ignored by Git. Camera and microphone require localhost or HTTPS.
+Add the key only to `.env.local` as `OPENAI_API_KEY`. Never use a `NEXT_PUBLIC_` prefix. `.env*` is ignored by Git. Camera and microphone require localhost or HTTPS. If the project is already linked with the Vercel CLI, `vercel env pull .env.local --environment=development` can securely create this ignored server-only file without copying the value through source code or chat.
 
 Run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. Without a key, local landmarks still work and server-backed actions show honest configuration errors.
 
@@ -34,7 +34,7 @@ Run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. Withou
 2. Keep the Next.js preset and default build settings.
 3. Go to **Project Settings → Environment Variables**.
 4. Add `OPENAI_API_KEY` as a **Sensitive** variable. Paste it only into Vercel’s protected value field and select the environments you need.
-5. Optionally add `OPENAI_VISION_MODEL` and `OPENAI_REALTIME_MODEL` from `.env.example`.
+5. Optionally add `OPENAI_VISION_MODEL`, `OPENAI_IMAGE_MODEL`, and `OPENAI_REALTIME_MODEL` from `.env.example`.
 6. Deploy; redeploy after environment changes.
 
 Never put the key in source, browser code, GitHub, issues, screenshots, logs, or chat. Rotate it immediately if exposed.
@@ -44,6 +44,7 @@ Never put the key in source, browser code, GitHub, issues, screenshots, logs, or
 - `lib/face-analysis.ts`: local proportion estimate and placement adaptations.
 - `app/api/evaluate`: low-detail, single-frame evaluation.
 - `app/api/realtime-session`: short-lived Realtime credentials.
+- `app/api/preview-look`: identity-preserving makeup preview edits.
 - `app/api/import-look`: screenshot-to-structured-guide analysis with uncertainty labels.
 
 The importer intentionally accepts screenshots instead of claiming to download arbitrary social links. MediaPipe assets currently load from Google/jsDelivr; self-host them before enforcing a restrictive production CSP.
