@@ -9,6 +9,7 @@ A privacy-first, face-aware makeup coach built with Next.js, MediaPipe Face Land
 - Face shape is a fallible, editable estimate.
 - A reduced still frame is sent only after consent and only when **Check my placement** is pressed.
 - Uploaded tutorial videos are sampled in the browser. Ordered still frames are used for one lesson-creation request and are not saved by the app.
+- Pasted tutorial links are saved with the in-memory lesson so users can reopen the original source. The app does not download or claim to analyze protected social videos from a URL; users can optionally upload a copy they have permission to use.
 - Voice is optional. The permanent key stays server-side; the browser receives a short-lived credential.
 - **Stop camera & end session** stops media tracks, tracking, voice, and the peer connection.
 
@@ -49,3 +50,5 @@ Never put the key in source, browser code, GitHub, issues, screenshots, logs, or
 - `lib/video-frames.ts`: browser-side, timeline-wide tutorial frame sampling.
 
 Raw video is not sent to a general-purpose model. The browser samples the visual timeline, and spoken-only details are explicitly treated as uncertain. MediaPipe assets currently load from Google/jsDelivr; self-host them before enforcing a restrictive production CSP.
+
+For link-based lessons, the browser validates `http://` and `https://` URLs but the server never fetches them. If no video copy is uploaded, the AI builds the lesson from the user’s written description and labels the linked video as not analyzed.

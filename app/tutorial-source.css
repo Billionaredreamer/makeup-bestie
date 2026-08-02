@@ -1,0 +1,81 @@
+.source-grid.lesson-sources {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tutorial-link-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.tutorial-link-box > label:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: white;
+  font-weight: 700;
+}
+
+.tutorial-link-box input[type="url"] {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  color: var(--brown);
+  background: var(--cream);
+  font: 14px Georgia, serif;
+}
+
+.tutorial-link-box input[type="url"]:focus {
+  outline: 2px solid var(--blush);
+  border-color: var(--rose);
+}
+
+.optional-upload { margin: 0; }
+
+.saved-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 13px;
+  margin: 14px 0;
+}
+
+.saved-source small {
+  color: var(--rose);
+  letter-spacing: .13em;
+  font-size: 8px;
+}
+
+.saved-source p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.saved-source a,
+.studio-source-link {
+  color: var(--rose);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.studio-source-link {
+  display: inline-block;
+  margin: -3px 0 15px;
+}
+
+@media (max-width: 800px) {
+  .source-grid.lesson-sources,
+  .tutorial-link-box {
+    grid-template-columns: 1fr;
+  }
+}

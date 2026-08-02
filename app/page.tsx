@@ -6,10 +6,10 @@ import { estimateFaceProfile, placementFor, type FaceProfile, type FaceShape, ty
 import { extractTutorialFrames } from "@/lib/video-frames";
 
 type View = "home" | "onboarding" | "studio-intake" | "look-brief" | "preview" | "face-map" | "consent" | "session" | "import" | "profile";
-type LookSource = "video" | "describe";
+type LookSource = "video" | "link" | "describe";
 type LessonRegion = "all-face" | "complexion" | "forehead" | "both-cheeks" | "left-cheek" | "right-cheek" | "both-eyes" | "left-eye" | "right-eye" | "brows" | "nose" | "lips" | "jaw" | "none";
 type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; technique: "prep"|"base"|"conceal"|"contour"|"blush"|"highlight"|"eyes"|"eyeliner"|"brow"|"lips"|"finish"; referenceCue: string; adaptation: string; uncertain: boolean };
-type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[]; analysisScope: string; steps: LessonStep[] };
+type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[]; analysisScope: string; steps: LessonStep[]; sourceUrl?: string; sourceVideoAnalyzed?: boolean };
 type GuidanceMode = "alternate" | "one-area" | "free";
 type MapRegion = { id: string; label: string; x: number; y: number; instruction: string };
 type CameraState = "off" | "starting" | "tracking" | "denied" | "no-face" | "poor-light" | "error";
@@ -21,6 +21,13 @@ const defaultLesson: LessonStep[] = [
   { title:"Frame the eyes", instruction:"Build the eye shape in light layers.", product:"Shadow or liner", region:"both-eyes", technique:"eyeliner", referenceCue:"Soft eye definition", adaptation:"Follow your natural eye angle.", uncertain:false },
   { title:"Finish the lip", instruction:"Trace your natural lip border and blend toward the center.", product:"Lip color", region:"lips", technique:"lips", referenceCue:"Finished lip", adaptation:"Keep your natural border visible.", uncertain:false },
 ];
+
+const normalizeTutorialUrl = (value: string) => {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : "";
+  } catch { return ""; }
+};
 
 function Logo({ home }: { home: () => void }) { return <button className="logo" onClick={home}><span>m</span> makeup bestie</button>; }
 
@@ -41,6 +48,7 @@ export default function App() {
   const [voiceConnecting, setVoiceConnecting] = useState(false);
   const [lookSource, setLookSource] = useState<LookSource>("video");
   const [lookNotes, setLookNotes] = useState("");
+  const [lookUrl, setLookUrl] = useState("");
   const [lookFile, setLookFile] = useState<File | null>(null);
   const [lookReferenceFrame, setLookReferenceFrame] = useState("");
   const [lessonAnalyzing, setLessonAnalyzing] = useState(false);
@@ -165,7 +173,7 @@ export default function App() {
     const isCurrent = () => voiceAttempt.current === attempt;
     try {
       setFeedback("Connecting your voice bestie…");
-      const lessonContext = JSON.stringify({ look: brief ? { title:brief.title, summary:brief.summary, analysisScope:brief.analysisScope, steps:brief.steps } : null, currentStep:currentLesson, faceShapeEstimate:shape, skinPreference:answers.skin, experience:answers.level, availableProducts:ownedProducts });
+      const lessonContext = JSON.stringify({ look: brief ? { title:brief.title, summary:brief.summary, analysisScope:brief.analysisScope, sourceStatus:brief.sourceUrl ? brief.sourceVideoAnalyzed ? "The original link was saved and an uploaded copy was visually analyzed." : "The original link was saved for the user, but its contents were not accessed; rely only on the written description." : "No external link was supplied.", steps:brief.steps } : null, currentStep:currentLesson, faceShapeEstimate:shape, skinPreference:answers.skin, experience:answers.level, availableProducts:ownedProducts });
       const tokenRes = await fetch("/api/realtime-session", { method: "POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ lessonContext }) });
       const token = await tokenRes.json();
       if (!tokenRes.ok) throw new Error(token.error);
@@ -254,16 +262,19 @@ export default function App() {
   const createBrief = async () => {
     if (lookSource === "video" && !lookFile) { setLessonError("Choose a tutorial video first."); return; }
     if (lookSource === "describe" && !lookNotes.trim()) { setLessonError("Describe the look you want first."); return; }
+    const sourceUrl = lookSource === "link" ? normalizeTutorialUrl(lookUrl) : "";
+    if (lookSource === "link" && !sourceUrl) { setLessonError("Paste a complete tutorial link beginning with http:// or https://."); return; }
+    if (lookSource === "link" && !lookFile && !lookNotes.trim()) { setLessonError("Add a short description, or upload a copy of the linked tutorial for visual analysis."); return; }
     setLessonAnalyzing(true); setLessonError("");
     try {
       const tutorial = lookFile ? await extractTutorialFrames(lookFile) : { frames: [], duration: 0 };
       setLookReferenceFrame(tutorial.frames.at(-1) || "");
       const context = JSON.stringify({ skin:answers.skin || "not provided", tone:answers.tone || "not provided", experience:answers.level || "not provided", goal:answers.goal || "not provided", faceShapeEstimate:shape || "pending and adjustable", lessonMode });
-      const response = await fetch("/api/import-look", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ frames:tutorial.frames, duration:tutorial.duration, description:lookNotes, context }) });
+      const response = await fetch("/api/import-look", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ frames:tutorial.frames, duration:tutorial.duration, description:lookNotes, context, sourceMode:lookSource }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       const guide = data as Omit<LookBrief,"time"> & { estimatedMinutes:number };
-      setBrief({ ...guide, time:`${guide.estimatedMinutes} min` });
+      setBrief({ ...guide, time:`${guide.estimatedMinutes} min`, sourceUrl:sourceUrl || undefined, sourceVideoAnalyzed:lookSource === "link" ? Boolean(lookFile) : undefined });
       setOwnedProducts([]); setStep(0); go("look-brief");
     } catch (error) { setLessonError(error instanceof Error ? error.message : "The personalized lesson could not be created."); }
     finally { setLessonAnalyzing(false); }
@@ -277,10 +288,11 @@ export default function App() {
         <button className="back" onClick={() => go("home")}>← Back home</button>
         <p className="eyebrow">Start with the vision</p>
         <h1>What look are we creating?</h1>
-        <p className="studio-lede">Upload the tutorial you want your bestie to study, or describe the look in your own words. The personalized lesson is created before the camera opens.</p>
-        <div className="source-grid two-sources">
+        <p className="studio-lede">Upload a tutorial, paste the link where you found it, or describe the look in your own words. The personalized lesson is created before the camera opens.</p>
+        <div className="source-grid lesson-sources">
           {([
             ["video","▶","Upload a tutorial","We’ll sample the full visual timeline and extract its sequence."],
+            ["link","↗","Paste a tutorial link","Keep the original TikTok, Instagram, YouTube, or other web source with your lesson."],
             ["describe","✎","Describe your idea","Tell us the mood, colors, techniques, and occasion."],
           ] as const).map(([id,icon,title,copy]) => <button key={id} className={lookSource===id?"source-option selected":"source-option"} onClick={() => { setLookSource(id); setLookFile(null); setLessonError(""); }}>
             <i>{icon}</i><b>{title}</b><span>{copy}</span>
@@ -291,14 +303,27 @@ export default function App() {
           <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event => { setLookFile(event.target.files?.[0] || null); setLessonError(""); }}/>
           {lookFile && <small>Attached: {lookFile.name}</small>}
         </label>}
+        {lookSource==="link" && <div className="tutorial-link-box">
+          <label>
+            <span>Paste the original tutorial link</span>
+            <input type="url" inputMode="url" value={lookUrl} onChange={event => { setLookUrl(event.target.value); setLessonError(""); }} placeholder="https://www.tiktok.com/..."/>
+          </label>
+          <label className="upload-zone intake-upload optional-upload">
+            <span>Optional: upload a copy for full visual analysis</span>
+            <small>Only upload a video you have permission to use.</small>
+            <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event => { setLookFile(event.target.files?.[0] || null); setLessonError(""); }}/>
+            {lookFile && <small>Attached: {lookFile.name}</small>}
+          </label>
+        </div>}
         <label className="look-notes">
-          <span>{lookSource==="describe"?"Describe your look":"Anything you want the coach to prioritize?"}</span>
-          <textarea value={lookNotes} onChange={event => setLookNotes(event.target.value)} placeholder="Example: Keep the base light, make it beginner-friendly, and soften the wing for my eye shape."/>
+          <span>{lookSource==="describe"?"Describe your look":lookSource==="link"&&!lookFile?"Briefly describe what happens in the linked tutorial":"Anything you want the coach to prioritize?"}</span>
+          <textarea value={lookNotes} onChange={event => setLookNotes(event.target.value)} placeholder={lookSource==="link"&&!lookFile?"Example: Soft brown smoky eye, lifted liner, peach blush, and a glossy nude lip.":"Example: Keep the base light, make it beginner-friendly, and soften the wing for my eye shape."}/>
         </label>
         {lookSource==="video" && <p className="honest-note"><b>How video analysis works:</b> We sample ordered frames across the tutorial from beginning to end. The visible application sequence is analyzed; spoken-only product names or instructions are labeled uncertain.</p>}
+        {lookSource==="link" && <p className="honest-note"><b>How links work:</b> We save the original link so you can reopen it. A protected social video is not downloaded or watched from the URL. Upload a permitted copy for visual analysis; otherwise your lesson is based on your description and clearly labeled that way.</p>}
         {lessonError && <p className="error">{lessonError}</p>}
-        <button className="primary intake-continue" disabled={lessonAnalyzing || (lookSource==="video"?!lookFile:!lookNotes.trim())} onClick={createBrief}>
-          {lessonAnalyzing ? lookSource==="video" ? "Studying the tutorial timeline…" : "Building your personalized lesson…" : "Create my personalized lesson →"}
+        <button className="primary intake-continue" disabled={lessonAnalyzing || (lookSource==="video"&&!lookFile) || (lookSource==="describe"&&!lookNotes.trim()) || (lookSource==="link"&&(!lookUrl.trim()||(!lookFile&&!lookNotes.trim())))} onClick={createBrief}>
+          {lessonAnalyzing ? lookFile ? "Studying the tutorial timeline…" : "Building your personalized lesson…" : "Create my personalized lesson →"}
         </button>
       </section>
     </main>
@@ -317,6 +342,7 @@ export default function App() {
             <small>HOW WE’LL MAKE IT YOURS</small><h2>Same energy. Your features.</h2>
             <textarea aria-label="Personalized adaptation" value={brief.adaptation} onChange={event => setBrief({...brief,adaptation:event.target.value})}/>
             <p className="analysis-scope"><b>What the AI reviewed:</b> {brief.analysisScope}</p>
+            {brief.sourceUrl && <div className="saved-source"><div><small>ORIGINAL TUTORIAL</small><p>{brief.sourceVideoAnalyzed?"Linked source saved · uploaded copy analyzed":"Linked source saved · video itself not analyzed"}</p></div><a href={brief.sourceUrl} target="_blank" rel="noopener noreferrer">Open tutorial ↗</a></div>}
             <div className="uncertain"><b>What we’re not certain about</b><ul>{brief.uncertainties.map(item=><li key={item}>{item}</li>)}</ul></div>
           </article>
           <article className="product-check">
@@ -473,6 +499,7 @@ export default function App() {
             <p className="eyebrow">Now we’re doing</p><h2>{currentLesson.title}</h2>
             <p className="instruction">{currentLesson.instruction}</p>
             <div className="tutorial-cue"><small>FROM YOUR TUTORIAL</small><p>{currentLesson.referenceCue}</p></div>
+            {brief?.sourceUrl&&<a className="studio-source-link" href={brief.sourceUrl} target="_blank" rel="noopener noreferrer">Open original tutorial ↗</a>}
             {shape&&<div className="face-result"><small>ADJUSTABLE ESTIMATE</small><p>Your proportions appear closest to <b>{shape}-shaped</b>.</p><select aria-label="Correct face shape" value={shape} onChange={event=>setShape(event.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(item=><option key={item}>{item}</option>)}</select><p>{personalizedPlacement}</p></div>}
             <div className="session-actions">
               <button className="outline placement-button" onClick={revealPlacement} disabled={camera!=="tracking"}>{placementVisible?"Highlighting placement…":"Show me where"}</button>
@@ -493,7 +520,7 @@ export default function App() {
     </>;
   }
 
-  if (view === "import") return <>{nav}<main className="simple-page page-enter"><section className="import-card"><div className="import-icon">▶</div><p className="eyebrow">Tutorial-aware lessons</p><h1>Start with a video or your own words.</h1><p>Finished-look photos are no longer used as lesson sources. Upload a tutorial video for ordered visual analysis, or describe the look you want.</p><button className="primary wide" onClick={()=>go("studio-intake")}>Create my personalized lesson →</button></section></main></>;
+  if (view === "import") return <>{nav}<main className="simple-page page-enter"><section className="import-card"><div className="import-icon">▶</div><p className="eyebrow">Tutorial-aware lessons</p><h1>Start with a video, a link, or your own words.</h1><p>Upload a tutorial video for ordered visual analysis, paste its original social link to keep it with your lesson, or describe the look you want.</p><button className="primary wide" onClick={()=>go("studio-intake")}>Create my personalized lesson →</button></section></main></>;
 
   if (view === "profile") return <>{nav}<main className="profile page-enter"><section className="profile-top"><div className="avatar large">S</div><div><p className="eyebrow">Your beauty shelf</p><h1>Good to see you.</h1><p>{answers.skin||"Your"} skin · {answers.goal||"Personalized makeup"} · face estimate {shape||"not set"}</p></div></section><div className="stat-row"><div><b>2</b><span>Saved looks</span></div><div><b>Local</b><span>Face tracking</span></div><div><b>0</b><span>Saved face images</span></div></div></main></>;
 

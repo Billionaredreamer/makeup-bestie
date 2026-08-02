@@ -10,12 +10,13 @@ const responseText = (data: any) => data?.output_text || data?.output?.flatMap((
 export async function POST(req: NextRequest) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return NextResponse.json({ error: "Tutorial analysis needs OPENAI_API_KEY in the server environment." }, { status: 503 });
-  let body: { frames?: unknown; description?: unknown; context?: unknown; duration?: unknown };
+  let body: { frames?: unknown; description?: unknown; context?: unknown; duration?: unknown; sourceMode?: unknown };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Send a tutorial video analysis request or a written look description." }, { status: 400 }); }
   const frames = Array.isArray(body.frames) ? body.frames.filter((item): item is string => typeof item === "string" && item.startsWith("data:image/jpeg;base64,")).slice(0, 12) : [];
   const description = String(body.description || "").trim().slice(0, 3000);
   const context = String(body.context || "").slice(0, 6000);
   const duration = Math.max(0, Math.min(Number(body.duration) || 0, 3600));
+  const sourceMode = body.sourceMode === "link" ? "link" : body.sourceMode === "video" ? "video" : "describe";
   if (!frames.length && !description) return NextResponse.json({ error: "Upload a tutorial video or describe the look you want." }, { status: 400 });
   if (frames.some(frame => frame.length > 900_000)) return NextResponse.json({ error: "One or more tutorial frames are too large to analyze." }, { status: 413 });
 
@@ -29,7 +30,9 @@ export async function POST(req: NextRequest) {
   const visualContent = frames.map((image_url, index) => ({ type: "input_image" as const, image_url, detail: index % 3 === 0 ? "high" as const : "low" as const }));
   const sourceExplanation = frames.length
     ? `These ${frames.length} ordered still frames sample a ${Math.round(duration)} second tutorial from beginning to end. Infer only visually supported sequence changes. Spoken-only details and exact products may be missing.`
-    : "The user supplied a written look description and no tutorial video.";
+    : sourceMode === "link"
+      ? "The user saved an external tutorial link, but the URL contents were not provided and must not be treated as viewed. Build the lesson only from the written description and say so plainly in analysisScope."
+      : "The user supplied a written look description and no tutorial video.";
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
