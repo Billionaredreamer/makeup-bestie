@@ -1,25 +1,26 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @next/next/no-img-element -- preparation photos use temporary local blob URLs */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { estimateFaceProfile, placementFor, type FaceProfile, type FaceShape, type Point } from "@/lib/face-analysis";
+import { extractTutorialFrames } from "@/lib/video-frames";
 
 type View = "home" | "onboarding" | "studio-intake" | "look-brief" | "preview" | "face-map" | "consent" | "session" | "import" | "profile";
-type LookSource = "video" | "reference" | "curated" | "describe";
-type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[] };
+type LookSource = "video" | "describe";
+type LessonRegion = "all-face" | "complexion" | "forehead" | "both-cheeks" | "left-cheek" | "right-cheek" | "both-eyes" | "left-eye" | "right-eye" | "brows" | "nose" | "lips" | "jaw" | "none";
+type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; technique: "prep"|"base"|"conceal"|"contour"|"blush"|"highlight"|"eyes"|"eyeliner"|"brow"|"lips"|"finish"; referenceCue: string; adaptation: string; uncertain: boolean };
+type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[]; analysisScope: string; steps: LessonStep[] };
 type GuidanceMode = "alternate" | "one-area" | "free";
 type MapRegion = { id: string; label: string; x: number; y: number; instruction: string };
 type CameraState = "off" | "starting" | "tracking" | "denied" | "no-face" | "poor-light" | "error";
-type ImportedGuide = { title: string; summary: string; steps: { title: string; instruction: string; product: string }[]; uncertainties: string[] };
-const lesson = [
-  ["Prep your canvas", "Press primer into the center, then blend outward.", "prep"],
-  ["Even the base", "Tap skin tint in thin layers; keep the hairline sheer.", "base"],
-  ["Personalized sculpt", "Follow the live cheek guides and blend upward.", "contour"],
-  ["Blush & glow", "Place blush inside the rose guides, then soften every edge.", "blush"],
-  ["Frame the eyes", "Use the eye guides as direction, not a hard boundary.", "eyeliner"],
-  ["Finish the lip", "Trace your natural lip border and blend toward the center.", "lips"],
-] as const;
+const defaultLesson: LessonStep[] = [
+  { title:"Prep your canvas", instruction:"Press primer into the center, then blend outward.", product:"Primer", region:"all-face", technique:"prep", referenceCue:"Foundation preparation", adaptation:"Use thin, comfortable layers.", uncertain:false },
+  { title:"Even the base", instruction:"Tap skin tint in thin layers; keep the hairline sheer.", product:"Skin tint or foundation", region:"complexion", technique:"base", referenceCue:"Even complexion", adaptation:"Add coverage only where you want it.", uncertain:false },
+  { title:"Personalized sculpt", instruction:"Blend softly beneath the cheekbone.", product:"Contour", region:"both-cheeks", technique:"contour", referenceCue:"Soft definition", adaptation:"Follow your adjustable proportion estimate.", uncertain:false },
+  { title:"Blush & glow", instruction:"Place blush lightly, then soften every edge.", product:"Blush", region:"both-cheeks", technique:"blush", referenceCue:"Lifted cheek color", adaptation:"Adjust direction to your cheek proportions.", uncertain:false },
+  { title:"Frame the eyes", instruction:"Build the eye shape in light layers.", product:"Shadow or liner", region:"both-eyes", technique:"eyeliner", referenceCue:"Soft eye definition", adaptation:"Follow your natural eye angle.", uncertain:false },
+  { title:"Finish the lip", instruction:"Trace your natural lip border and blend toward the center.", product:"Lip color", region:"lips", technique:"lips", referenceCue:"Finished lip", adaptation:"Keep your natural border visible.", uncertain:false },
+];
 
 function Logo({ home }: { home: () => void }) { return <button className="logo" onClick={home}><span>m</span> makeup bestie</button>; }
 
@@ -38,12 +39,12 @@ export default function App() {
   const [paused, setPaused] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceConnecting, setVoiceConnecting] = useState(false);
-  const [importResult, setImportResult] = useState<ImportedGuide | null>(null);
-  const [importError, setImportError] = useState("");
-  const [importing, setImporting] = useState(false);
-  const [lookSource, setLookSource] = useState<LookSource>("reference");
+  const [lookSource, setLookSource] = useState<LookSource>("video");
   const [lookNotes, setLookNotes] = useState("");
   const [lookFile, setLookFile] = useState<File | null>(null);
+  const [lookReferenceFrame, setLookReferenceFrame] = useState("");
+  const [lessonAnalyzing, setLessonAnalyzing] = useState(false);
+  const [lessonError, setLessonError] = useState("");
   const [brief, setBrief] = useState<LookBrief | null>(null);
   const [ownedProducts, setOwnedProducts] = useState<string[]>([]);
   const [prepPhoto, setPrepPhoto] = useState("");
@@ -59,6 +60,7 @@ export default function App() {
   const [previewError, setPreviewError] = useState("");
   const [previewIntensity, setPreviewIntensity] = useState<"soft"|"reference"|"dramatic">("reference");
   const [lessonMode, setLessonMode] = useState<"complete"|"feature">("complete");
+  const [placementVisible, setPlacementVisible] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -66,16 +68,27 @@ export default function App() {
   const peer = useRef<RTCPeerConnection | null>(null);
   const microphone = useRef<MediaStream | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
+  const voiceChannel = useRef<RTCDataChannel | null>(null);
+  const placementTimer = useRef<number>(0);
+  const placementVisibleRef = useRef(false);
   const voiceAttempt = useRef(0);
   const voiceStarting = useRef(false);
   void profile;
+  const activeLesson = brief?.steps?.length ? brief.steps : defaultLesson;
+  const currentLesson = activeLesson[Math.min(step, activeLesson.length - 1)];
+  const currentLessonRef = useRef(currentLesson);
 
-  const go = (v: View) => { const next = v === "consent" && !brief ? "studio-intake" : v === "consent" && !prepPhoto ? "preview" : v; setView(next); window.scrollTo(0, 0); };
-  const stopVoice = useCallback(() => { voiceAttempt.current += 1; voiceStarting.current = false; setVoiceConnecting(false); microphone.current?.getTracks().forEach(track => track.stop()); microphone.current = null; peer.current?.close(); peer.current = null; if (audio.current) { audio.current.pause(); audio.current.srcObject = null; audio.current.remove(); } audio.current = null; setVoiceActive(false); }, []);
+  const go = (v: View) => { const next = v === "consent" && !brief ? "studio-intake" : v; setView(next); window.scrollTo(0, 0); };
+  const stopVoice = useCallback(() => { voiceAttempt.current += 1; voiceStarting.current = false; setVoiceConnecting(false); voiceChannel.current?.close(); voiceChannel.current = null; microphone.current?.getTracks().forEach(track => track.stop()); microphone.current = null; peer.current?.close(); peer.current = null; if (audio.current) { audio.current.pause(); audio.current.srcObject = null; audio.current.remove(); } audio.current = null; setVoiceActive(false); }, []);
   const stopCamera = useCallback((userAction?: unknown) => { cancelAnimationFrame(raf.current); stream.current?.getTracks().forEach(t => t.stop()); stream.current = null; if (video.current) video.current.srcObject = null; setCamera("off"); stopVoice(); if (userAction) { setPaused(false); setFeedback("Session ended. Your camera and microphone are off."); setView("look-brief"); window.scrollTo(0, 0); } }, [stopVoice]);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
+  useEffect(() => () => window.clearTimeout(placementTimer.current), []);
   useEffect(() => () => { if (prepPhoto) URL.revokeObjectURL(prepPhoto); }, [prepPhoto]);
+
+  useEffect(() => { currentLessonRef.current = currentLesson; }, [currentLesson]);
+  useEffect(() => { placementVisibleRef.current = placementVisible; }, [placementVisible]);
+  const revealPlacement = useCallback(() => { window.clearTimeout(placementTimer.current); placementVisibleRef.current = true; setPlacementVisible(true); placementTimer.current = window.setTimeout(() => { placementVisibleRef.current = false; setPlacementVisible(false); }, 4200); }, []);
 
   const drawGuides = useCallback((p: Point[]) => {
     const c = canvas.current, v = video.current;
@@ -84,11 +97,17 @@ export default function App() {
     const ctx = c.getContext("2d")!; ctx.scale(devicePixelRatio, devicePixelRatio); ctx.clearRect(0, 0, v.clientWidth, v.clientHeight);
     const xy = (i: number) => ({ x: (1 - p[i].x) * v.clientWidth, y: p[i].y * v.clientHeight });
     const line = (ids: number[], color: string, width = 3) => { ctx.beginPath(); ids.forEach((id, i) => { const q = xy(id); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.setLineDash([8, 8]); ctx.stroke(); };
-    const kind = lesson[step][2];
-    if (kind === "contour" || kind === "blush") { line([234, 117, 111, 50], "rgba(250,190,177,.9)", 5); line([454, 346, 340, 280], "rgba(250,190,177,.9)", 5); }
-    if (kind === "eyeliner") { line([33, 130, 127], "rgba(243,215,182,.95)"); line([263, 359, 356], "rgba(243,215,182,.95)"); }
-    if (kind === "lips") { line([61, 0, 291, 17, 61], "rgba(250,190,177,.9)"); }
-  }, [step]);
+    if (!placementVisibleRef.current) return;
+    const region = currentLessonRef.current.region, kind = currentLessonRef.current.technique;
+    const cheeks = region === "both-cheeks" || region === "left-cheek" || region === "right-cheek" || kind === "contour" || kind === "blush" || kind === "highlight";
+    if (cheeks && region !== "right-cheek") line([234, 117, 111, 50], "rgba(250,190,177,.95)", 6);
+    if (cheeks && region !== "left-cheek") line([454, 346, 340, 280], "rgba(250,190,177,.95)", 6);
+    if (region === "both-eyes" || region === "left-eye" || kind === "eyeliner" || kind === "eyes") line([33, 130, 127], "rgba(243,215,182,.98)", 5);
+    if (region === "both-eyes" || region === "right-eye" || kind === "eyeliner" || kind === "eyes") line([263, 359, 356], "rgba(243,215,182,.98)", 5);
+    if (region === "brows" || kind === "brow") { line([70, 63, 105, 66], "rgba(243,215,182,.98)", 5); line([300, 293, 334, 296], "rgba(243,215,182,.98)", 5); }
+    if (region === "lips" || kind === "lips") line([61, 0, 291, 17, 61], "rgba(250,190,177,.95)", 5);
+    if (region === "nose") line([168, 1, 2], "rgba(243,215,182,.98)", 5);
+  }, []);
 
   const startCamera = useCallback(async () => {
     setCamera("starting"); setFeedback("Loading private, on-device face tracking…");
@@ -130,7 +149,7 @@ export default function App() {
   const aiCheck = async () => {
     if (!consent.frames || !video.current) return; setChecking(true); setFeedback("Sending one reduced still frame for this check…");
     try { const c = document.createElement("canvas"); c.width = 640; c.height = 480; c.getContext("2d")!.drawImage(video.current, 0, 0, 640, 480); const image = c.toDataURL("image/jpeg", .72);
-      const r = await fetch("/api/evaluate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image, step: lesson[step][0], placement: shape ? placementFor(shape)[lesson[step][2] as keyof ReturnType<typeof placementFor>] : "natural proportions", profile: shape }) });
+      const r = await fetch("/api/evaluate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image, step: currentLesson.title, placement: currentLesson.adaptation, profile: shape }) });
       const data = await r.json(); if (!r.ok) throw new Error(data.error); setFeedback(data.feedback);
     } catch (e) { setFeedback(e instanceof Error ? e.message : "The AI check is temporarily unavailable."); } finally { setChecking(false); }
   };
@@ -146,7 +165,8 @@ export default function App() {
     const isCurrent = () => voiceAttempt.current === attempt;
     try {
       setFeedback("Connecting your voice bestie…");
-      const tokenRes = await fetch("/api/realtime-session", { method: "POST" });
+      const lessonContext = JSON.stringify({ look: brief ? { title:brief.title, summary:brief.summary, analysisScope:brief.analysisScope, steps:brief.steps } : null, currentStep:currentLesson, faceShapeEstimate:shape, skinPreference:answers.skin, experience:answers.level, availableProducts:ownedProducts });
+      const tokenRes = await fetch("/api/realtime-session", { method: "POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ lessonContext }) });
       const token = await tokenRes.json();
       if (!tokenRes.ok) throw new Error(token.error);
       if (!isCurrent()) return;
@@ -160,8 +180,8 @@ export default function App() {
       if (!isCurrent()) return;
       microphone.current = pendingMic;
       pendingMic.getTracks().forEach(track => pendingPeer?.addTrack(track, pendingMic!));
-      const dc = pendingPeer.createDataChannel("oai-events");
-      dc.onopen = () => { if (isCurrent()) dc.send(JSON.stringify({ type: "response.create", response: { instructions: `Greet the user briefly, then coach the current ${lesson[step][0]} step. The current instruction is: ${lesson[step][1]}` } })); };
+      const dc = pendingPeer.createDataChannel("oai-events"); voiceChannel.current = dc;
+      dc.onopen = () => { if (isCurrent()) { revealPlacement(); dc.send(JSON.stringify({ type: "response.create", response: { instructions: `Greet the user briefly, refer to the uploaded tutorial or written look, then coach this step: ${currentLesson.title}. Instruction: ${currentLesson.instruction}. Adaptation: ${currentLesson.adaptation}. Say that you are highlighting the placement now.` } })); } };
       dc.onerror = () => { if (isCurrent()) setFeedback("The voice conversation was interrupted. Tap Start voice to reconnect."); };
       const offer = await pendingPeer.createOffer(); await pendingPeer.setLocalDescription(offer);
       const sdp = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", headers: { Authorization: `Bearer ${ephemeral}`, "Content-Type": "application/sdp" }, body: offer.sdp });
@@ -178,7 +198,7 @@ export default function App() {
     }
   };
 
-  const nav = <header className="nav-shell"><nav className="nav"><Logo home={() => go("home")} /><div className="nav-links"><button onClick={() => go("home")}>Home</button><button onClick={() => go("studio-intake")}>Studio</button><button onClick={() => go("import")}>Import</button><button onClick={() => go("profile")}>My looks</button></div><button className="nav-cta" onClick={() => go("onboarding")}>Find my look →</button></nav></header>;
+  const nav = <header className="nav-shell"><nav className="nav"><Logo home={() => go("home")} /><div className="nav-links"><button onClick={() => go("home")}>Home</button><button onClick={() => go("studio-intake")}>Studio</button><button onClick={() => go("studio-intake")}>Inspiration</button><button onClick={() => go("profile")}>My looks</button></div><button className="nav-cta" onClick={() => go("onboarding")}>Find my look →</button></nav></header>;
 
   const approximateMap = (): MapRegion[] => [
     { id:"complexion", label:"Full complexion", x:50, y:48, instruction:"Work in thin layers from the center outward. You choose which areas receive coverage." },
@@ -226,36 +246,96 @@ export default function App() {
     if (!prepFile || !brief) return;
     setPreviewStatus("generating"); setPreviewError("");
     const form = new FormData(); form.append("face",prepFile); form.append("description",`${brief.title}. ${brief.summary}. ${lookNotes}`); form.append("intensity",previewIntensity);
-    if (lookFile?.type.startsWith("image/")) form.append("reference",lookFile);
+    if (lookReferenceFrame) form.append("reference", await (await fetch(lookReferenceFrame)).blob(), "tutorial-finish.jpg");
     try { const response = await fetch("/api/preview-look",{method:"POST",body:form}); const data = await response.json(); if(!response.ok) throw new Error(data.error); setPreviewImage(data.image); setPreviewStatus("ready"); }
     catch(error) { setPreviewError(error instanceof Error?error.message:"Preview generation failed."); setPreviewStatus("error"); }
   };
 
-  const createBrief = () => {
-    const level = answers.level || "beginner-friendly";
-    const skin = answers.skin || "your selected";
-    const sourceLabel = lookSource === "video" ? "uploaded tutorial" : lookSource === "reference" ? "reference image" : lookSource === "curated" ? "curated rose-glow look" : "look description";
-    setBrief({
-      title: lookNotes.trim() || (lookSource === "curated" ? "Rose-lit soft glam" : "Your personalized statement look"),
-      summary: `A polished look interpreted from your ${sourceLabel}, broken into calm, achievable layers.`,
-      adaptation: `We’ll keep coverage comfortable for ${skin.toLowerCase()} skin and explain every technique at a ${level.toLowerCase()} pace. Placement will adjust after your optional face scan.`,
-      difficulty: level === "Just starting" ? "Beginner" : "Intermediate",
-      time: "20–30 min",
-      products: ["Skin prep or moisturizer", "Base or concealer", "Cream or powder blush", "Neutral eye color", "Liner or deep shadow", "Lip color or gloss"],
-      uncertainties: lookFile ? ["Exact shades and product formulas may differ from the reference."] : ["No visual reference was attached, so color and finish are based on your description."],
-    });
-    go("look-brief");
+  const createBrief = async () => {
+    if (lookSource === "video" && !lookFile) { setLessonError("Choose a tutorial video first."); return; }
+    if (lookSource === "describe" && !lookNotes.trim()) { setLessonError("Describe the look you want first."); return; }
+    setLessonAnalyzing(true); setLessonError("");
+    try {
+      const tutorial = lookFile ? await extractTutorialFrames(lookFile) : { frames: [], duration: 0 };
+      setLookReferenceFrame(tutorial.frames.at(-1) || "");
+      const context = JSON.stringify({ skin:answers.skin || "not provided", tone:answers.tone || "not provided", experience:answers.level || "not provided", goal:answers.goal || "not provided", faceShapeEstimate:shape || "pending and adjustable", lessonMode });
+      const response = await fetch("/api/import-look", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ frames:tutorial.frames, duration:tutorial.duration, description:lookNotes, context }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      const guide = data as Omit<LookBrief,"time"> & { estimatedMinutes:number };
+      setBrief({ ...guide, time:`${guide.estimatedMinutes} min` });
+      setOwnedProducts([]); setStep(0); go("look-brief");
+    } catch (error) { setLessonError(error instanceof Error ? error.message : "The personalized lesson could not be created."); }
+    finally { setLessonAnalyzing(false); }
   };
 
 
-  if (view === "studio-intake") return <>{nav}<main className="simple-page page-enter"><section className="studio-intake-card"><button className="back" onClick={() => go("home")}>← Back home</button><p className="eyebrow">Start with the vision</p><h1>What look are we creating?</h1><p className="studio-lede">Bring the inspiration first. Your bestie will explain the look, adapt it to you, and prepare every step before the camera opens.</p><div className="source-grid">{([
-      ["video","▶","Upload a tutorial","Attach a video you want to recreate."],
-      ["reference","▧","Upload a reference","Use a screenshot or finished-look photo."],
-      ["curated","✦","Choose a Bestie look","Start with a ready-made editorial look."],
-      ["describe","✎","Describe your idea","Tell us the mood, colors, and occasion."],
-    ] as const).map(([id,icon,title,copy])=><button key={id} className={lookSource===id?"source-option selected":"source-option"} onClick={()=>{setLookSource(id);setLookFile(null)}}><i>{icon}</i><b>{title}</b><span>{copy}</span></button>)}</div>{(lookSource==="video"||lookSource==="reference")&&<label className="upload-zone intake-upload"><span>{lookSource==="video"?"Choose a tutorial video":"Choose a reference image"}</span><input type="file" accept={lookSource==="video"?"video/mp4,video/webm,video/quicktime":"image/png,image/jpeg,image/webp"} onChange={e=>setLookFile(e.target.files?.[0]||null)}/>{lookFile&&<small>Attached: {lookFile.name}</small>}</label>}{lookSource==="curated"&&<div className="curated-choice"><div><span>BESTIE ORIGINAL</span><b>Rose-lit soft glam</b><small>Satin skin · lifted rose blush · soft brown wing · glossy lip</small></div><strong>8 steps<br/>25 min</strong></div>}<label className="look-notes"><span>{lookSource==="describe"?"Describe your look":"Anything you want us to notice?"}</span><textarea value={lookNotes} onChange={e=>setLookNotes(e.target.value)} placeholder="Example: Keep the base light, make it beginner-friendly, and use a softer liner for hooded eyes."/></label>{lookSource==="video"&&<p className="honest-note"><b>Video preview:</b> We’ll use your attached tutorial as the session reference. Automatic frame-by-frame extraction is not active yet, so this first brief is guided by your description.</p>}<button className="primary intake-continue" disabled={lookSource==="describe"&&!lookNotes.trim()} onClick={createBrief}>Prepare my Look Brief →</button></section></main></>;
-
-  if (view === "look-brief" && brief) return <>{nav}<main className="simple-page page-enter"><section className="brief-shell"><button className="back" onClick={() => go("studio-intake")}>← Change inspiration</button><div className="brief-heading"><div><p className="eyebrow">Your personalized Look Brief</p><input aria-label="Look title" value={brief.title} onChange={e=>setBrief({...brief,title:e.target.value})}/><p>{brief.summary}</p></div><div className="brief-meta"><span><b>{brief.difficulty}</b> difficulty</span><span><b>{brief.time}</b> estimated</span><span><b>6</b> guided steps</span></div></div><div className="brief-grid"><article className="brief-adaptation"><small>HOW WE’LL MAKE IT YOURS</small><h2>Same energy. Your features.</h2><textarea aria-label="Personalized adaptation" value={brief.adaptation} onChange={e=>setBrief({...brief,adaptation:e.target.value})}/><div className="uncertain"><b>What we’re not certain about</b><ul>{brief.uncertainties.map(item=><li key={item}>{item}</li>)}</ul></div></article><article className="product-check"><small>BEFORE YOU BEGIN</small><h2>Gather your products</h2><p>Check what you have. Missing products can be skipped or substituted during the lesson.</p>{brief.products.map(product=><label key={product}><input type="checkbox" checked={ownedProducts.includes(product)} onChange={e=>setOwnedProducts(e.target.checked?[...ownedProducts,product]:ownedProducts.filter(p=>p!==product))}/><span>{product}</span><small>{ownedProducts.includes(product)?"Ready":"Can substitute"}</small></label>)}</article></div><div className="brief-actions"><button className="outline" onClick={() => go("studio-intake")}>Edit inspiration</button><button className="primary" onClick={() => go("consent")}>Review privacy & open camera →</button></div></section></main></>;
+  if (view === "studio-intake") return <>
+    {nav}
+    <main className="simple-page page-enter">
+      <section className="studio-intake-card">
+        <button className="back" onClick={() => go("home")}>← Back home</button>
+        <p className="eyebrow">Start with the vision</p>
+        <h1>What look are we creating?</h1>
+        <p className="studio-lede">Upload the tutorial you want your bestie to study, or describe the look in your own words. The personalized lesson is created before the camera opens.</p>
+        <div className="source-grid two-sources">
+          {([
+            ["video","▶","Upload a tutorial","We’ll sample the full visual timeline and extract its sequence."],
+            ["describe","✎","Describe your idea","Tell us the mood, colors, techniques, and occasion."],
+          ] as const).map(([id,icon,title,copy]) => <button key={id} className={lookSource===id?"source-option selected":"source-option"} onClick={() => { setLookSource(id); setLookFile(null); setLessonError(""); }}>
+            <i>{icon}</i><b>{title}</b><span>{copy}</span>
+          </button>)}
+        </div>
+        {lookSource==="video" && <label className="upload-zone intake-upload">
+          <span>Choose a tutorial video</span>
+          <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event => { setLookFile(event.target.files?.[0] || null); setLessonError(""); }}/>
+          {lookFile && <small>Attached: {lookFile.name}</small>}
+        </label>}
+        <label className="look-notes">
+          <span>{lookSource==="describe"?"Describe your look":"Anything you want the coach to prioritize?"}</span>
+          <textarea value={lookNotes} onChange={event => setLookNotes(event.target.value)} placeholder="Example: Keep the base light, make it beginner-friendly, and soften the wing for my eye shape."/>
+        </label>
+        {lookSource==="video" && <p className="honest-note"><b>How video analysis works:</b> We sample ordered frames across the tutorial from beginning to end. The visible application sequence is analyzed; spoken-only product names or instructions are labeled uncertain.</p>}
+        {lessonError && <p className="error">{lessonError}</p>}
+        <button className="primary intake-continue" disabled={lessonAnalyzing || (lookSource==="video"?!lookFile:!lookNotes.trim())} onClick={createBrief}>
+          {lessonAnalyzing ? lookSource==="video" ? "Studying the tutorial timeline…" : "Building your personalized lesson…" : "Create my personalized lesson →"}
+        </button>
+      </section>
+    </main>
+  </>;
+  if (view === "look-brief" && brief) return <>
+    {nav}
+    <main className="simple-page page-enter">
+      <section className="brief-shell">
+        <button className="back" onClick={() => go("studio-intake")}>← Change inspiration</button>
+        <div className="brief-heading">
+          <div><p className="eyebrow">Your personalized Look Brief</p><input aria-label="Look title" value={brief.title} onChange={event => setBrief({...brief,title:event.target.value})}/><p>{brief.summary}</p></div>
+          <div className="brief-meta"><span><b>{brief.difficulty}</b> difficulty</span><span><b>{brief.time}</b> estimated</span><span><b>{brief.steps.length}</b> tutorial steps</span></div>
+        </div>
+        <div className="brief-grid">
+          <article className="brief-adaptation">
+            <small>HOW WE’LL MAKE IT YOURS</small><h2>Same energy. Your features.</h2>
+            <textarea aria-label="Personalized adaptation" value={brief.adaptation} onChange={event => setBrief({...brief,adaptation:event.target.value})}/>
+            <p className="analysis-scope"><b>What the AI reviewed:</b> {brief.analysisScope}</p>
+            <div className="uncertain"><b>What we’re not certain about</b><ul>{brief.uncertainties.map(item=><li key={item}>{item}</li>)}</ul></div>
+          </article>
+          <article className="product-check">
+            <small>BEFORE YOU BEGIN</small><h2>Gather your products</h2><p>Check what you have. Missing products can be skipped or substituted during the lesson.</p>
+            {brief.products.map(product=><label key={product}><input type="checkbox" checked={ownedProducts.includes(product)} onChange={event=>setOwnedProducts(event.target.checked?[...ownedProducts,product]:ownedProducts.filter(item=>item!==product))}/><span>{product}</span><small>{ownedProducts.includes(product)?"Ready":"Can substitute"}</small></label>)}
+          </article>
+        </div>
+        <section className="lesson-outline">
+          <p className="eyebrow">What your bestie learned</p><h2>The tutorial, turned into your lesson.</h2>
+          <div>{brief.steps.map((item,index)=><article key={index}><span>{String(index+1).padStart(2,"0")}</span><div><b>{item.title}</b><p>{item.referenceCue}</p><small>{item.adaptation}{item.uncertain?" · uncertain detail":""}</small></div></article>)}</div>
+        </section>
+        <div className="brief-actions">
+          <button className="outline" onClick={() => go("studio-intake")}>Edit inspiration</button>
+          <button className="outline" onClick={() => go("preview")}>Optional makeup preview</button>
+          <button className="primary" onClick={() => go("consent")}>Review privacy & open camera →</button>
+        </div>
+      </section>
+    </main>
+  </>;
 
   if (view === "face-map") { const active = mapRegions.find(region=>region.id===selectedRegion); return <>{nav}<main className="simple-page page-enter"><section className="map-shell"><button className="back" onClick={()=>go("look-brief")}>← Back to Look Brief</button><div className="map-heading"><div><p className="eyebrow">Your private preparation map</p><h1>See the plan on your face.</h1><p>Take or choose a clear front-facing photo. Facial landmarks and region coordinates stay in this browser.</p></div><span className={`map-status ${mapStatus}`}>{mapStatus==="analyzing"?"Mapping…":mapStatus==="ready"?"Local map ready":"Photo required"}</span></div><div className="map-layout"><div className="photo-map"><label className="photo-capture">{prepPhoto?<span>Replace preparation photo</span>:<><b>Take your preparation photo</b><span>Face forward in soft, even light. Remove glasses if comfortable.</span></>}<input type="file" accept="image/jpeg,image/png,image/webp" capture="user" onChange={e=>{const file=e.target.files?.[0];if(file)analyzePreparationPhoto(file)}}/></label>{prepPhoto&&<div className="mapped-photo"><img src={prepPhoto} alt="Your private preparation preview"/>{mapStatus==="ready"&&mapRegions.map(region=><button aria-label={`Select ${region.label}`} title={region.label} key={region.id} className={`map-point ${selectedRegion===region.id?"active":""} region-${region.id}`} style={{left:`${region.x}%`,top:`${region.y}%`}} onClick={()=>setSelectedRegion(region.id)}><span>{region.label}</span></button>)}</div>}<p className={`map-message ${mapStatus}`}>{mapMessage}</p>{(mapStatus==="no-face"||mapStatus==="error")&&<button className="outline" onClick={()=>{setMapRegions(approximateMap());setMapStatus("ready");setMapMessage("Using an approximate map. Placement is guidance, not a detected measurement.")}}>Use approximate map</button>}</div><aside className="map-controls"><small>CURRENT REGION</small><h2>{active?.label||"Choose a region"}</h2><p>{active?.instruction||"Your region guidance will appear here after the map is ready."}</p>{shape&&<div className="map-estimate"><span>Adjustable estimate</span><b>{shape}-shaped proportions</b><select value={shape} onChange={e=>setShape(e.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(item=><option key={item}>{item}</option>)}</select></div>}<small>HOW SHOULD WE GUIDE YOU?</small><div className="mode-options">{([
           ["alternate","Match both sides","Alternate left and right for easier balance."],
@@ -356,9 +436,64 @@ export default function App() {
 
   if (view === "consent") return <>{nav}<main className="simple-page page-enter"><section className="consent-card"><p className="eyebrow">Before the camera turns on</p><h1>Your face stays yours.</h1><p>Makeup Bestie uses facial geometry only to place guides. Face shape is an adjustable estimate—not a fact about you.</p><div className="privacy-grid"><article><b>On your device</b><p>Continuous landmarks and moving overlays. No camera footage is saved.</p></article><article><b>Only when you ask</b><p>One compressed frame can be sent to OpenAI for a visual makeup check.</p></article><article><b>Your control</b><p>Visible activity labels and an immediate stop-camera button.</p></article></div><label className="check"><input type="checkbox" checked={consent.local} onChange={e=>setConsent({...consent,local:e.target.checked})}/><span><b>Allow on-device face landmarks</b><small>Required for face-aware guides.</small></span></label><label className="check"><input type="checkbox" checked={consent.frames} onChange={e=>setConsent({...consent,frames:e.target.checked})}/><span><b>Allow selected AI frame checks</b><small>Optional. Frames are sent only when you tap “Check my placement.”</small></span></label><label className="check"><input type="checkbox" checked={consent.voice} onChange={e=>setConsent({...consent,voice:e.target.checked})}/><span><b>Allow microphone for voice coaching</b><small>Optional. Starts only when you tap “Start voice.”</small></span></label><button className="primary wide" disabled={!consent.local} onClick={() => go("session")}>Start private camera session →</button></section></main></>;
 
-  if (view === "session") { const placement = shape ? placementFor(shape) : null; return <>{nav}<main className="studio page-enter"><div className="studio-heading"><div><p className="eyebrow">Face-aware guided session</p><h1>Rose-lit soft glam</h1></div><div className={`live-pill ${camera}`}><i /> {camera==="tracking"?"Local tracking active":camera==="starting"?"Loading landmarks…":camera==="no-face"?"No face detected":camera==="denied"?"Permission denied":"Camera off"}</div></div><div className="studio-grid"><section className="camera-card"><video ref={video} autoPlay muted playsInline/><canvas ref={canvas} className="face-overlay"/><div className="camera-fallback"><div className="face-shape">♡</div><p>{feedback}</p>{(camera==="denied"||camera==="error"||camera==="off")&&<button className="cream-button" onClick={startCamera}>Retry camera</button>}</div><div className="camera-top"><span>{camera==="tracking"?"CAMERA + LOCAL AI":"CAMERA OFF"}</span><span>{consent.frames?"Frame sharing: ask only":"Frames never shared"}</span></div><div className="bestie-bubble"><div className="avatar small">M</div><p><b>Makeup Bestie</b><br/>{feedback}</p></div></section><aside className="lesson-card"><div className="lesson-progress"><span>Step {step+1} of {lesson.length}</span><span>Face-aware</span></div><div className="dots">{lesson.map((_,i)=><i key={i} className={i<=step?"active":""}/>)}</div><p className="eyebrow">Now we’re doing</p><h2>{lesson[step][0]}</h2><p className="instruction">{lesson[step][1]}</p>{shape&&<div className="face-result"><small>ADJUSTABLE ESTIMATE</small><p>Your proportions appear closest to <b>{shape}-shaped</b>.</p><select aria-label="Correct face shape" value={shape} onChange={e=>setShape(e.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(s=><option key={s}>{s}</option>)}</select>{placement&&<p>{placement[lesson[step][2] as keyof typeof placement] || placement.blush}</p>}</div>}<div className="session-actions">{consent.frames&&<button className="outline" onClick={aiCheck} disabled={checking||camera!=="tracking"}>{checking?"Checking one frame…":"Check my placement"}</button>}{consent.voice&&!voiceActive&&<button className="outline" onClick={startVoice} disabled={voiceConnecting}>{voiceConnecting?"Connecting one coach…":"Start voice"}</button>}<button className="primary wide" onClick={()=>setStep(Math.min(lesson.length-1,step+1))}>Next step →</button></div><div className="lesson-controls"><button onClick={()=>setStep(Math.max(0,step-1))}>↶ Back</button><button onClick={()=>{setPaused(!paused);setFeedback(paused?"Local tracking resumed.":"Analysis paused. No frames are being processed.")}}>{paused?"▶ Resume":"Ⅱ Pause"}</button><button onClick={()=>{audio.current?.play();setFeedback(lesson[step][1])}}>↻ Repeat</button><button onClick={()=>{setMuted(!muted);if(audio.current)audio.current.muted=!muted}}>{muted?"Unmute":"Mute"}</button></div><button className="stop-button" onClick={stopCamera}>Stop camera & end session</button></aside></div></main></> }
+  if (view === "session") {
+    const placement = shape ? placementFor(shape) : null;
+    const placementKey = currentLesson.technique as keyof ReturnType<typeof placementFor>;
+    const personalizedPlacement = placement?.[placementKey] || currentLesson.adaptation;
+    const moveToStep = (nextStep:number) => {
+      const target = Math.max(0,Math.min(activeLesson.length-1,nextStep));
+      setStep(target); setPlacementVisible(false);
+      const item = activeLesson[target];
+      if (voiceChannel.current?.readyState==="open") {
+        voiceChannel.current.send(JSON.stringify({ type:"conversation.item.create", item:{ type:"message", role:"user", content:[{ type:"input_text", text:`Move to lesson step ${target+1}: ${item.title}. Tutorial cue: ${item.referenceCue}. Personalized adaptation: ${item.adaptation}.` }] } }));
+        voiceChannel.current.send(JSON.stringify({ type:"response.create", response:{ instructions:"Briefly introduce the next tutorial-specific step and say the user can ask to see placement." } }));
+      }
+    };
+    const repeatInstruction = () => {
+      if (voiceChannel.current?.readyState==="open") voiceChannel.current.send(JSON.stringify({ type:"response.create", response:{ instructions:`Repeat the current ${currentLesson.title} instruction more simply. Refer to the tutorial cue and say you are highlighting placement now.` } }));
+      revealPlacement(); setFeedback(currentLesson.instruction);
+    };
+    return <>
+      {nav}
+      <main className="studio page-enter">
+        <div className="studio-heading">
+          <div><p className="eyebrow">Tutorial-aware guided session</p><h1>{brief?.title || "Your personalized lesson"}</h1></div>
+          <div className={`live-pill ${camera}`}><i /> {camera==="tracking"?"Local tracking active":camera==="starting"?"Loading landmarks…":camera==="no-face"?"No face detected":camera==="denied"?"Permission denied":"Camera off"}</div>
+        </div>
+        <div className="studio-grid">
+          <section className="camera-card">
+            <video ref={video} autoPlay muted playsInline/><canvas ref={canvas} className="face-overlay"/>
+            <div className="camera-fallback"><div className="face-shape">♡</div><p>{feedback}</p>{(camera==="denied"||camera==="error"||camera==="off")&&<button className="cream-button" onClick={startCamera}>Retry camera</button>}</div>
+            <div className="camera-top"><span>{camera==="tracking"?"CAMERA + LOCAL AI":"CAMERA OFF"}</span><span>{placementVisible?"PLACEMENT HIGHLIGHT ACTIVE":consent.frames?"Frame sharing: ask only":"Frames never shared"}</span></div>
+            <div className="bestie-bubble"><div className="avatar small">M</div><p><b>Makeup Bestie</b><br/>{feedback}</p></div>
+          </section>
+          <aside className="lesson-card">
+            <div className="lesson-progress"><span>Step {step+1} of {activeLesson.length}</span><span>Tutorial-aware</span></div>
+            <div className="dots">{activeLesson.map((_,index)=><i key={index} className={index<=step?"active":""}/>)}</div>
+            <p className="eyebrow">Now we’re doing</p><h2>{currentLesson.title}</h2>
+            <p className="instruction">{currentLesson.instruction}</p>
+            <div className="tutorial-cue"><small>FROM YOUR TUTORIAL</small><p>{currentLesson.referenceCue}</p></div>
+            {shape&&<div className="face-result"><small>ADJUSTABLE ESTIMATE</small><p>Your proportions appear closest to <b>{shape}-shaped</b>.</p><select aria-label="Correct face shape" value={shape} onChange={event=>setShape(event.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(item=><option key={item}>{item}</option>)}</select><p>{personalizedPlacement}</p></div>}
+            <div className="session-actions">
+              <button className="outline placement-button" onClick={revealPlacement} disabled={camera!=="tracking"}>{placementVisible?"Highlighting placement…":"Show me where"}</button>
+              {consent.frames&&<button className="outline" onClick={aiCheck} disabled={checking||camera!=="tracking"}>{checking?"Checking one frame…":"Check my placement"}</button>}
+              {consent.voice&&!voiceActive&&<button className="outline" onClick={startVoice} disabled={voiceConnecting}>{voiceConnecting?"Connecting one coach…":"Start voice"}</button>}
+              <button className="primary wide" onClick={()=>moveToStep(step+1)} disabled={step===activeLesson.length-1}>Next step →</button>
+            </div>
+            <div className="lesson-controls">
+              <button onClick={()=>moveToStep(step-1)}>↶ Back</button>
+              <button onClick={()=>{setPaused(!paused);setFeedback(paused?"Local tracking resumed.":"Analysis paused. No frames are being processed.")}}>{paused?"▶ Resume":"Ⅱ Pause"}</button>
+              <button onClick={repeatInstruction}>↻ Repeat</button>
+              <button onClick={()=>{setMuted(!muted);if(audio.current)audio.current.muted=!muted}}>{muted?"Unmute":"Mute"}</button>
+            </div>
+            <button className="stop-button" onClick={stopCamera}>Stop camera & end session</button>
+          </aside>
+        </div>
+      </main>
+    </>;
+  }
 
-  if (view === "import") return <>{nav}<main className="simple-page page-enter"><section className="import-card"><div className="import-icon">↑</div><p className="eyebrow">Real tutorial importer</p><h1>Upload the inspiration.</h1><p>Start with a clear screenshot from a tutorial or finished look. Links aren’t downloaded. Uploaded files are analyzed for this request and aren’t saved by Makeup Bestie.</p><form onSubmit={async e=>{e.preventDefault();setImporting(true);setImportError("");setImportResult(null);const fd=new FormData(e.currentTarget);fd.set("context",JSON.stringify({answers,shape}));try{const r=await fetch("/api/import-look",{method:"POST",body:fd});const d=await r.json();if(!r.ok)throw new Error(d.error);setImportResult(d)}catch(e){setImportError(e instanceof Error?e.message:"Import failed.")}finally{setImporting(false)}}}><label className="upload-zone"><span>Choose a tutorial screenshot</span><input name="file" type="file" accept="image/png,image/jpeg,image/webp" required/></label><button className="primary wide" disabled={importing}>{importing?"Analyzing the uploaded image…":"Create personalized guide"}</button></form>{importError&&<p className="error">{importError}</p>}{importResult&&<div className="guide-result"><small>AI-EXTRACTED GUIDE</small><h2>{importResult.title}</h2><p>{importResult.summary}</p>{importResult.steps?.map((s:any,i:number)=><article key={i}><b>{i+1}. {s.title}</b><p>{s.instruction}</p><small>{s.product}</small></article>)}{importResult.uncertainties?.length>0&&<div className="uncertain"><b>Uncertain guesses</b><ul>{importResult.uncertainties.map((u:string)=><li key={u}>{u}</li>)}</ul></div>}</div>}</section></main></>;
+  if (view === "import") return <>{nav}<main className="simple-page page-enter"><section className="import-card"><div className="import-icon">▶</div><p className="eyebrow">Tutorial-aware lessons</p><h1>Start with a video or your own words.</h1><p>Finished-look photos are no longer used as lesson sources. Upload a tutorial video for ordered visual analysis, or describe the look you want.</p><button className="primary wide" onClick={()=>go("studio-intake")}>Create my personalized lesson →</button></section></main></>;
 
   if (view === "profile") return <>{nav}<main className="profile page-enter"><section className="profile-top"><div className="avatar large">S</div><div><p className="eyebrow">Your beauty shelf</p><h1>Good to see you.</h1><p>{answers.skin||"Your"} skin · {answers.goal||"Personalized makeup"} · face estimate {shape||"not set"}</p></div></section><div className="stat-row"><div><b>2</b><span>Saved looks</span></div><div><b>Local</b><span>Face tracking</span></div><div><b>0</b><span>Saved face images</span></div></div></main></>;
 

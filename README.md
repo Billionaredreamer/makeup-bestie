@@ -1,6 +1,6 @@
 # Makeup Bestie
 
-A privacy-first, face-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. Continuous tracking runs in the browser; OpenAI is used only for user-triggered visual checks, uploaded-reference analysis, and optional Realtime voice.
+A privacy-first, face-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. Continuous tracking runs in the browser; OpenAI is used for user-triggered visual checks, tutorial-frame or text lesson creation, optional previews, and optional Realtime voice.
 
 ## Privacy
 
@@ -8,7 +8,7 @@ A privacy-first, face-aware makeup coach built with Next.js, MediaPipe Face Land
 - Facial landmarks and moving overlays are computed on-device.
 - Face shape is a fallible, editable estimate.
 - A reduced still frame is sent only after consent and only when **Check my placement** is pressed.
-- Uploaded screenshots are used for one analysis request and are not saved by the app.
+- Uploaded tutorial videos are sampled in the browser. Ordered still frames are used for one lesson-creation request and are not saved by the app.
 - Voice is optional. The permanent key stays server-side; the browser receives a short-lived credential.
 - **Stop camera & end session** stops media tracks, tracking, voice, and the peer connection.
 
@@ -45,6 +45,7 @@ Never put the key in source, browser code, GitHub, issues, screenshots, logs, or
 - `app/api/evaluate`: low-detail, single-frame evaluation.
 - `app/api/realtime-session`: short-lived Realtime credentials.
 - `app/api/preview-look`: identity-preserving makeup preview edits.
-- `app/api/import-look`: screenshot-to-structured-guide analysis with uncertainty labels.
+- `app/api/import-look`: ordered tutorial-frame or text-to-structured-lesson analysis with uncertainty labels.
+- `lib/video-frames.ts`: browser-side, timeline-wide tutorial frame sampling.
 
-The importer intentionally accepts screenshots instead of claiming to download arbitrary social links. MediaPipe assets currently load from Google/jsDelivr; self-host them before enforcing a restrictive production CSP.
+Raw video is not sent to a general-purpose model. The browser samples the visual timeline, and spoken-only details are explicitly treated as uncertain. MediaPipe assets currently load from Google/jsDelivr; self-host them before enforcing a restrictive production CSP.
