@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+/* eslint-disable @typescript-eslint/no-explicit-any -- OpenAI REST response items are narrowed by runtime type tags */
 
 export const runtime = "nodejs";
 const MAX_IMAGE_CHARS = 2_800_000;
+const responseText = (data: any) => data?.output_text || data?.output?.flatMap((item:any) => item?.content || []).find((item:any) => item?.type === "output_text")?.text;
 
 export async function POST(req: NextRequest) {
   const key = process.env.OPENAI_API_KEY;
@@ -23,5 +25,5 @@ export async function POST(req: NextRequest) {
   });
   const data = await response.json();
   if (!response.ok) return NextResponse.json({ error: data?.error?.message || "The AI check is temporarily unavailable." }, { status: response.status });
-  return NextResponse.json({ feedback: data.output_text || "I couldn’t make a reliable assessment from that frame." });
+  return NextResponse.json({ feedback: responseText(data) || "I couldn’t make a reliable assessment from that frame." });
 }
