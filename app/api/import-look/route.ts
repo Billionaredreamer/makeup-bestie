@@ -22,8 +22,8 @@ export async function POST(req: NextRequest) {
 
   const schema = { type: "object", additionalProperties: false, required: ["title","summary","adaptation","difficulty","estimatedMinutes","products","steps","uncertainties","analysisScope"], properties: {
     title: { type: "string" }, summary: { type: "string" }, adaptation: { type: "string" }, difficulty: { type: "string" }, estimatedMinutes: { type: "integer" },
-    products: { type: "array", items: { type: "string" } }, analysisScope: { type: "string" }, uncertainties: { type: "array", items: { type: "string" } },
-    steps: { type: "array", minItems: 1, maxItems: 14, items: { type: "object", additionalProperties: false, required: ["title","instruction","product","region","technique","referenceCue","adaptation","uncertain"], properties: {
+    products: { type: "array", maxItems: 14, items: { type: "string" } }, analysisScope: { type: "string" }, uncertainties: { type: "array", maxItems: 6, items: { type: "string" } },
+    steps: { type: "array", minItems: 1, maxItems: 10, items: { type: "object", additionalProperties: false, required: ["title","instruction","product","region","technique","referenceCue","adaptation","uncertain"], properties: {
       title: { type: "string" }, instruction: { type: "string" }, product: { type: "string" }, region: { type: "string", enum: regions }, technique: { type: "string", enum: techniques }, referenceCue: { type: "string" }, adaptation: { type: "string" }, uncertain: { type: "boolean" }
     } } } }
   };
@@ -36,17 +36,17 @@ export async function POST(req: NextRequest) {
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: process.env.OPENAI_VISION_MODEL || "gpt-5.6-luna", max_output_tokens: 2400,
-        text: { format: { type: "json_schema", name: "personalized_makeup_lesson", strict: true, schema } },
+      body: JSON.stringify({ model: process.env.OPENAI_VISION_MODEL || "gpt-5.6-luna", max_output_tokens: 6400, store: false, reasoning: { effort: "low" },
+        text: { verbosity: "low", format: { type: "json_schema", name: "personalized_makeup_lesson", strict: true, schema } },
         input: [{ role: "user", content: [
-          { type: "input_text", text: `Create a chronological, practical makeup lesson. ${sourceExplanation}\nUser request: ${description || "Recreate the visible tutorial style."}\nUser context: ${context}\nUse product categories rather than invented brands. Put tutorial-specific evidence in referenceCue. Put face/skin/skill personalization in adaptation. Treat face shape as an adjustable estimate. Flag every unsupported shade, product, or hidden step as uncertain.` },
+          { type: "input_text", text: `Create a concise chronological makeup lesson with 6-10 steps. ${sourceExplanation}\nUser request: ${description || "Recreate the visible tutorial style."}\nUser context: ${context}\nUse product categories rather than invented brands. Use the user's available products when possible and suggest simple categories for substitutions. Put tutorial evidence in referenceCue and face/skin/skill personalization in adaptation. Treat face shape as an adjustable estimate. Flag unsupported shades, products, or hidden steps as uncertain. Keep the summary and adaptation under three short sentences, and every step field to one practical sentence.` },
           ...visualContent,
         ] }]
       })
     });
     const data = await response.json();
     if (!response.ok) return NextResponse.json({ error: data?.error?.message || "Tutorial analysis failed." }, { status: response.status });
-    try { return NextResponse.json(JSON.parse(responseText(data))); } catch { return NextResponse.json({ error: data?.status === "incomplete" ? "The lesson analysis ran out of output space. Please try a shorter tutorial." : "The personalized lesson could not be formatted." }, { status: 502 }); }
+    try { return NextResponse.json(JSON.parse(responseText(data))); } catch { return NextResponse.json({ error: data?.status === "incomplete" ? "The AI could not finish the lesson format. Please try once more." : "The personalized lesson could not be formatted." }, { status: 502 }); }
   } catch {
     return NextResponse.json({ error: "The tutorial analysis service could not be reached." }, { status: 502 });
   }

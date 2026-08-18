@@ -2,6 +2,14 @@
 
 A privacy-first, face-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. Continuous tracking runs in the browser; OpenAI is used for user-triggered visual checks, tutorial-frame or text lesson creation, optional previews, and optional Realtime voice.
 
+## Launch flow
+
+1. Complete skin, complexion, experience, and makeup-goal onboarding.
+2. Take one bare-face photo for a private, on-device proportion scan and correct the estimate if needed.
+3. Paste the original tutorial link, optionally upload a permitted video copy for timeline analysis, describe the look, and select products already owned.
+4. Review the personalized plan and explicitly consent before sending one photo for an AI makeup preview.
+5. Choose **Product-by-product** for the complete routine or **Feature Focus** to tap an area on the preview and open a live guide only for that feature.
+
 ## Privacy
 
 - Camera footage is not recorded or permanently stored by the app.
@@ -10,6 +18,7 @@ A privacy-first, face-aware makeup coach built with Next.js, MediaPipe Face Land
 - A reduced still frame is sent only after consent and only when **Check my placement** is pressed.
 - Uploaded tutorial videos are sampled in the browser. Ordered still frames are used for one lesson-creation request and are not saved by the app.
 - Pasted tutorial links are saved with the in-memory lesson so users can reopen the original source. The app does not download or claim to analyze protected social videos from a URL; users can optionally upload a copy they have permission to use.
+- The face-scan photo stays local until the user separately opts into preview generation. Makeup Bestie does not save the generated-preview request or result.
 - Voice is optional. The permanent key stays server-side; the browser receives a short-lived credential.
 - **Stop camera & end session** stops media tracks, tracking, voice, and the peer connection.
 
@@ -52,3 +61,5 @@ Never put the key in source, browser code, GitHub, issues, screenshots, logs, or
 Raw video is not sent to a general-purpose model. The browser samples the visual timeline, and spoken-only details are explicitly treated as uncertain. MediaPipe assets currently load from Google/jsDelivr; self-host them before enforcing a restrictive production CSP.
 
 For link-based lessons, the browser validates `http://` and `https://` URLs but the server never fetches them. If no video copy is uploaded, the AI builds the lesson from the user’s written description and labels the linked video as not analyzed.
+
+Lesson creation returns a concise six-to-ten-step structured routine. Product-by-product mode follows that sequence; Feature Focus filters it to the selected complexion, cheek, eye, brow, nose, or lip steps. Continuous tracking remains local, while visual feedback is limited to the current step and sent only after the user presses **Check my placement**.
