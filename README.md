@@ -8,7 +8,8 @@ A privacy-first, face-aware makeup coach built with Next.js, MediaPipe Face Land
 2. Take one bare-face photo for a private, on-device proportion scan and correct the estimate if needed.
 3. Paste the original tutorial link, optionally upload a permitted video copy for timeline analysis, describe the look, and select products already owned.
 4. Review the personalized plan and explicitly consent before sending one photo for an AI makeup preview.
-5. Choose **Product-by-product** for the complete routine or **Feature Focus** to tap an area on the preview and open a live guide only for that feature.
+5. Start one face-first, product-by-product lesson. The tutorial stays in the background while the user’s own live face remains the main studio view.
+6. Each product step names every affected face area, provides a personalized completion checkpoint, and offers temporary moving placement guidance plus an optional user-triggered AI check.
 
 ## Privacy
 
@@ -62,4 +63,4 @@ Raw video is not sent to a general-purpose model. The browser samples the visual
 
 For link-based lessons, the browser validates `http://` and `https://` URLs but the server never fetches them. If no video copy is uploaded, the AI builds the lesson from the user’s written description and labels the linked video as not analyzed.
 
-Lesson creation returns a concise six-to-ten-step structured routine. Product-by-product mode follows that sequence; Feature Focus filters it to the selected complexion, cheek, eye, brow, nose, or lip steps. Continuous tracking remains local, while visual feedback is limited to the current step and sent only after the user presses **Check my placement**.
+Lesson creation returns a concise six-to-fourteen-step structured routine in the tutorial’s observed product order. A step may cover several areas—for example, concealer can include the under-eyes, nose, and mouth area—while remaining one product checkpoint. The generated preview and live target both use the user’s face; creator footage is not shown in the studio. Continuous tracking remains local, while visual feedback is limited to the current product and its declared areas and is sent only after the user presses **Check my placement**.

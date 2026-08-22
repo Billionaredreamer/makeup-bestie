@@ -8,7 +8,7 @@ const responseText = (data: any) => data?.output_text || data?.output?.flatMap((
 export async function POST(req: NextRequest) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return NextResponse.json({ error: "AI checks are not configured yet." }, { status: 503 });
-  const { image, step, placement, profile, focus, skinPreference } = await req.json();
+  const { image, step, product, placement, checkpoint, profile, focus, skinPreference } = await req.json();
   if (typeof image !== "string" || !image.startsWith("data:image/jpeg;base64,") || image.length > MAX_IMAGE_CHARS)
     return NextResponse.json({ error: "Invalid or oversized camera frame." }, { status: 400 });
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       max_output_tokens: 180,
       store: false,
       input: [{ role: "user", content: [
-        { type: "input_text", text: `Evaluate only the ${focus || "current makeup area"} for the ${step} step; ignore unrelated areas. Skin preference: ${skinPreference || "not provided"}. Local face estimate: ${profile}. Target placement: ${placement}. Give one brief, kind, side-specific correction if clearly supported; otherwise say placement looks even or that lighting/image quality prevents a reliable check. Never infer identity, health, ethnicity, age, emotion, or attractiveness.` },
+        { type: "input_text", text: `Evaluate only ${focus || "the current makeup area"} for the ${product || step} product step; ignore every unrelated face area. Skin preference: ${skinPreference || "not provided"}. Local face estimate: ${profile}. Personalized placement: ${placement}. Completion checkpoint: ${checkpoint || "The intended placement looks balanced and softly blended."}. Give one brief, encouraging, side-specific correction if clearly supported. If the checkpoint is met, say so and invite the user to move to the next product. If image quality is insufficient, say that plainly. Never infer identity, health, ethnicity, age, emotion, or attractiveness.` },
         { type: "input_image", image_url: image, detail: "low" },
       ] }],
     }),

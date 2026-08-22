@@ -7,39 +7,24 @@ import { extractTutorialFrames } from "@/lib/video-frames";
 
 type View = "home" | "onboarding" | "face-scan" | "studio-intake" | "look-brief" | "preview" | "face-map" | "consent" | "session" | "import" | "profile";
 type LessonRegion = "all-face" | "complexion" | "forehead" | "both-cheeks" | "left-cheek" | "right-cheek" | "both-eyes" | "left-eye" | "right-eye" | "brows" | "nose" | "lips" | "jaw" | "none";
-type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; technique: "prep"|"base"|"conceal"|"contour"|"blush"|"highlight"|"eyes"|"eyeliner"|"brow"|"lips"|"finish"; referenceCue: string; adaptation: string; uncertain: boolean };
+type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; areas: LessonRegion[]; technique: "prep"|"base"|"conceal"|"contour"|"blush"|"highlight"|"eyes"|"eyeliner"|"brow"|"lips"|"finish"; referenceCue: string; adaptation: string; checkpoint: string; uncertain: boolean };
 type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[]; analysisScope: string; steps: LessonStep[]; sourceUrl?: string; sourceVideoAnalyzed?: boolean };
 type GuidanceMode = "alternate" | "one-area" | "free";
 type MapRegion = { id: string; label: string; x: number; y: number; instruction: string };
 type CameraState = "off" | "starting" | "tracking" | "denied" | "no-face" | "poor-light" | "error";
-type LessonMode = "product" | "feature";
-type FeatureId = "complexion" | "cheeks" | "eyes" | "brows" | "nose" | "lips";
 const defaultLesson: LessonStep[] = [
-  { title:"Prep your canvas", instruction:"Press primer into the center, then blend outward.", product:"Primer", region:"all-face", technique:"prep", referenceCue:"Foundation preparation", adaptation:"Use thin, comfortable layers.", uncertain:false },
-  { title:"Even the base", instruction:"Tap skin tint in thin layers; keep the hairline sheer.", product:"Skin tint or foundation", region:"complexion", technique:"base", referenceCue:"Even complexion", adaptation:"Add coverage only where you want it.", uncertain:false },
-  { title:"Personalized sculpt", instruction:"Blend softly beneath the cheekbone.", product:"Contour", region:"both-cheeks", technique:"contour", referenceCue:"Soft definition", adaptation:"Follow your adjustable proportion estimate.", uncertain:false },
-  { title:"Blush & glow", instruction:"Place blush lightly, then soften every edge.", product:"Blush", region:"both-cheeks", technique:"blush", referenceCue:"Lifted cheek color", adaptation:"Adjust direction to your cheek proportions.", uncertain:false },
-  { title:"Frame the eyes", instruction:"Build the eye shape in light layers.", product:"Shadow or liner", region:"both-eyes", technique:"eyeliner", referenceCue:"Soft eye definition", adaptation:"Follow your natural eye angle.", uncertain:false },
-  { title:"Finish the lip", instruction:"Trace your natural lip border and blend toward the center.", product:"Lip color", region:"lips", technique:"lips", referenceCue:"Finished lip", adaptation:"Keep your natural border visible.", uncertain:false },
+  { title:"Prep your canvas", instruction:"Press primer into the center, then blend outward.", product:"Primer", region:"all-face", areas:["all-face"], technique:"prep", referenceCue:"Foundation preparation", adaptation:"Use thin, comfortable layers.", checkpoint:"Skin feels comfortable and looks evenly prepped without visible buildup.", uncertain:false },
+  { title:"Even the base", instruction:"Tap skin tint in thin layers; keep the hairline sheer.", product:"Skin tint or foundation", region:"complexion", areas:["complexion","forehead","both-cheeks","nose","jaw"], technique:"base", referenceCue:"Even complexion", adaptation:"Add coverage only where you want it.", checkpoint:"The complexion looks even while natural skin texture remains visible.", uncertain:false },
+  { title:"Personalized sculpt", instruction:"Blend softly beneath the cheekbone.", product:"Contour", region:"both-cheeks", areas:["both-cheeks","forehead","nose","jaw"], technique:"contour", referenceCue:"Soft definition", adaptation:"Follow your adjustable proportion estimate.", checkpoint:"The sculpting reads as soft dimension with no hard or unblended edges.", uncertain:false },
+  { title:"Blush & glow", instruction:"Place blush lightly, then soften every edge.", product:"Blush", region:"both-cheeks", areas:["both-cheeks"], technique:"blush", referenceCue:"Lifted cheek color", adaptation:"Adjust direction to your cheek proportions.", checkpoint:"Both cheeks carry a balanced wash of color in the intended direction.", uncertain:false },
+  { title:"Frame the eyes", instruction:"Build the eye shape in light layers.", product:"Shadow or liner", region:"both-eyes", areas:["both-eyes"], technique:"eyeliner", referenceCue:"Soft eye definition", adaptation:"Follow your natural eye angle.", checkpoint:"The eye shape is balanced before adding more intensity.", uncertain:false },
+  { title:"Finish the lip", instruction:"Trace your natural lip border and blend toward the center.", product:"Lip color", region:"lips", areas:["lips"], technique:"lips", referenceCue:"Finished lip", adaptation:"Keep your natural border visible.", checkpoint:"The lip edge is clean, softly blended, and close to the tutorial finish.", uncertain:false },
 ];
 
 const productOptions = ["Primer", "Foundation or skin tint", "Concealer", "Contour or bronzer", "Blush", "Highlighter", "Brow product", "Eyeshadow", "Eyeliner", "Mascara", "Lip liner", "Lip color", "Setting powder or spray"];
-const featureOptions: { id: FeatureId; label: string; x: number; y: number }[] = [
-  { id:"complexion", label:"Complexion", x:50, y:48 },
-  { id:"cheeks", label:"Cheeks", x:27, y:55 },
-  { id:"eyes", label:"Eyes", x:50, y:37 },
-  { id:"brows", label:"Brows", x:50, y:29 },
-  { id:"nose", label:"Nose", x:50, y:52 },
-  { id:"lips", label:"Lips", x:50, y:69 },
-];
-const featureForStep = (item: LessonStep): FeatureId => {
-  if (item.technique === "brow" || item.region === "brows") return "brows";
-  if (item.technique === "eyes" || item.technique === "eyeliner" || item.region.includes("eye")) return "eyes";
-  if (item.technique === "lips" || item.region === "lips") return "lips";
-  if (item.region === "nose") return "nose";
-  if (["contour","blush","highlight"].includes(item.technique) || item.region.includes("cheek")) return "cheeks";
-  return "complexion";
-};
+const areaLabels: Record<LessonRegion, string> = { "all-face":"full face", complexion:"complexion", forehead:"forehead", "both-cheeks":"both cheeks", "left-cheek":"left cheek", "right-cheek":"right cheek", "both-eyes":"both eyes", "left-eye":"left eye", "right-eye":"right eye", brows:"brows", nose:"nose", lips:"lips", jaw:"jaw and chin", none:"finish" };
+const stepAreas = (item: LessonStep) => [...new Set(item.areas?.length ? item.areas : [item.region])];
+const areaSummary = (item: LessonStep) => stepAreas(item).map(area => areaLabels[area]).join(" · ");
 
 const normalizeTutorialUrl = (value: string) => {
   try {
@@ -86,10 +71,8 @@ export default function App() {
   const [previewError, setPreviewError] = useState("");
   const [previewConsent, setPreviewConsent] = useState(false);
   const [previewIntensity, setPreviewIntensity] = useState<"soft"|"reference"|"dramatic">("reference");
-  const [lessonMode, setLessonMode] = useState<LessonMode>("product");
-  const [selectedFeature, setSelectedFeature] = useState<FeatureId>("eyes");
-  const [completedFeatures, setCompletedFeatures] = useState<FeatureId[]>([]);
   const [placementVisible, setPlacementVisible] = useState(false);
+  const [targetVisible, setTargetVisible] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -104,9 +87,7 @@ export default function App() {
   const voiceStarting = useRef(false);
   void profile;
   const fullLesson = brief?.steps?.length ? brief.steps : defaultLesson;
-  const focusedLesson = fullLesson.filter(item => featureForStep(item) === selectedFeature);
-  const activeLesson = lessonMode === "feature" && focusedLesson.length ? focusedLesson : fullLesson;
-  const availableFeatures = featureOptions.filter(feature => fullLesson.some(item => featureForStep(item) === feature.id));
+  const activeLesson = fullLesson;
   const currentLesson = activeLesson[Math.min(step, activeLesson.length - 1)];
   const currentLessonRef = useRef(currentLesson);
 
@@ -128,17 +109,21 @@ export default function App() {
     c.width = v.clientWidth * devicePixelRatio; c.height = v.clientHeight * devicePixelRatio;
     const ctx = c.getContext("2d")!; ctx.scale(devicePixelRatio, devicePixelRatio); ctx.clearRect(0, 0, v.clientWidth, v.clientHeight);
     const xy = (i: number) => ({ x: (1 - p[i].x) * v.clientWidth, y: p[i].y * v.clientHeight });
-    const line = (ids: number[], color: string, width = 3) => { ctx.beginPath(); ids.forEach((id, i) => { const q = xy(id); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.setLineDash([8, 8]); ctx.stroke(); };
+    const line = (ids: number[], color: string, width = 3, close = false) => { ctx.beginPath(); ids.forEach((id, i) => { const q = xy(id); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }); if (close) ctx.closePath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.setLineDash([8, 8]); ctx.stroke(); };
     if (!placementVisibleRef.current) return;
-    const region = currentLessonRef.current.region, kind = currentLessonRef.current.technique;
-    const cheeks = region === "both-cheeks" || region === "left-cheek" || region === "right-cheek" || kind === "contour" || kind === "blush" || kind === "highlight";
-    if (cheeks && region !== "right-cheek") line([234, 117, 111, 50], "rgba(250,190,177,.95)", 6);
-    if (cheeks && region !== "left-cheek") line([454, 346, 340, 280], "rgba(250,190,177,.95)", 6);
-    if (region === "both-eyes" || region === "left-eye" || kind === "eyeliner" || kind === "eyes") line([33, 130, 127], "rgba(243,215,182,.98)", 5);
-    if (region === "both-eyes" || region === "right-eye" || kind === "eyeliner" || kind === "eyes") line([263, 359, 356], "rgba(243,215,182,.98)", 5);
-    if (region === "brows" || kind === "brow") { line([70, 63, 105, 66], "rgba(243,215,182,.98)", 5); line([300, 293, 334, 296], "rgba(243,215,182,.98)", 5); }
-    if (region === "lips" || kind === "lips") line([61, 0, 291, 17, 61], "rgba(250,190,177,.95)", 5);
-    if (region === "nose") line([168, 1, 2], "rgba(243,215,182,.98)", 5);
+    const areas = new Set(stepAreas(currentLessonRef.current));
+    const includes = (...ids: LessonRegion[]) => ids.some(id => areas.has(id));
+    const fullFace = includes("all-face", "complexion");
+    if (fullFace) line([10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109], "rgba(243,215,182,.82)", 4, true);
+    if (fullFace || includes("forehead")) line([54,103,67,109,10,338,297,332,284], "rgba(243,215,182,.96)", 5);
+    if (fullFace || includes("both-cheeks", "left-cheek")) line([234,117,111,50], "rgba(250,190,177,.95)", 6);
+    if (fullFace || includes("both-cheeks", "right-cheek")) line([454,346,340,280], "rgba(250,190,177,.95)", 6);
+    if (includes("both-eyes", "left-eye")) line([33,130,127], "rgba(243,215,182,.98)", 5);
+    if (includes("both-eyes", "right-eye")) line([263,359,356], "rgba(243,215,182,.98)", 5);
+    if (includes("brows")) { line([70,63,105,66], "rgba(243,215,182,.98)", 5); line([300,293,334,296], "rgba(243,215,182,.98)", 5); }
+    if (includes("lips")) line([61,0,291,17,61], "rgba(250,190,177,.95)", 5, true);
+    if (fullFace || includes("nose")) line([168,1,2], "rgba(243,215,182,.98)", 5);
+    if (fullFace || includes("jaw")) line([234,172,136,150,149,176,148,152,377,400,378,379,365,397,288,454], "rgba(243,215,182,.88)", 4);
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -181,7 +166,7 @@ export default function App() {
   const aiCheck = async () => {
     if (!consent.frames || !video.current) return; setChecking(true); setFeedback("Sending one reduced still frame for this check…");
     try { const c = document.createElement("canvas"); c.width = 640; c.height = 480; c.getContext("2d")!.drawImage(video.current, 0, 0, 640, 480); const image = c.toDataURL("image/jpeg", .72);
-      const r = await fetch("/api/evaluate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image, step: currentLesson.title, placement: currentLesson.adaptation, profile: shape, focus:lessonMode==="feature"?selectedFeature:"current product step", skinPreference:answers.skin }) });
+      const r = await fetch("/api/evaluate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image, step: currentLesson.title, product:currentLesson.product, placement:currentLesson.adaptation, checkpoint:currentLesson.checkpoint, profile: shape, focus:areaSummary(currentLesson), skinPreference:answers.skin }) });
       const data = await r.json(); if (!r.ok) throw new Error(data.error); setFeedback(data.feedback);
     } catch (e) { setFeedback(e instanceof Error ? e.message : "The AI check is temporarily unavailable."); } finally { setChecking(false); }
   };
@@ -197,7 +182,7 @@ export default function App() {
     const isCurrent = () => voiceAttempt.current === attempt;
     try {
       setFeedback("Connecting your voice bestie…");
-      const lessonContext = JSON.stringify({ look: brief ? { title:brief.title, summary:brief.summary, analysisScope:brief.analysisScope, sourceStatus:brief.sourceUrl ? brief.sourceVideoAnalyzed ? "The original link was saved and an uploaded copy was visually analyzed." : "The original link was saved for the user, but its contents were not accessed; rely only on the written description." : "No external link was supplied.", steps:brief.steps } : null, currentStep:currentLesson, faceShapeEstimate:shape, skinPreference:answers.skin, experience:answers.level, availableProducts:ownedProducts });
+      const lessonContext = JSON.stringify({ lessonStyle:"The user sees only their own live face. Follow the tutorial's chronological product order and coach every face area attached to the current product step.", look: brief ? { title:brief.title, summary:brief.summary, analysisScope:brief.analysisScope, sourceStatus:brief.sourceUrl ? brief.sourceVideoAnalyzed ? "The original link was saved and an uploaded copy was visually analyzed." : "The original link was saved for the user, but its contents were not accessed; rely only on the written description." : "No external link was supplied.", steps:brief.steps } : null, currentStep:currentLesson, currentAreas:stepAreas(currentLesson), faceShapeEstimate:shape, skinPreference:answers.skin, experience:answers.level, availableProducts:ownedProducts });
       const tokenRes = await fetch("/api/realtime-session", { method: "POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ lessonContext }) });
       const token = await tokenRes.json();
       if (!tokenRes.ok) throw new Error(token.error);
@@ -213,7 +198,7 @@ export default function App() {
       microphone.current = pendingMic;
       pendingMic.getTracks().forEach(track => pendingPeer?.addTrack(track, pendingMic!));
       const dc = pendingPeer.createDataChannel("oai-events"); voiceChannel.current = dc;
-      dc.onopen = () => { if (isCurrent()) { revealPlacement(); dc.send(JSON.stringify({ type: "response.create", response: { instructions: `Greet the user briefly, refer to the uploaded tutorial or written look, then coach this step: ${currentLesson.title}. Instruction: ${currentLesson.instruction}. Adaptation: ${currentLesson.adaptation}. Say that you are highlighting the placement now.` } })); } };
+      dc.onopen = () => { if (isCurrent()) { revealPlacement(); dc.send(JSON.stringify({ type: "response.create", response: { instructions: `Greet the user briefly, refer to the tutorial-derived look, then coach this product step on their own face: ${currentLesson.product}. Areas: ${areaSummary(currentLesson)}. Instruction: ${currentLesson.instruction}. Adaptation: ${currentLesson.adaptation}. Checkpoint: ${currentLesson.checkpoint}. Say that you are highlighting the placement now.` } })); } };
       dc.onerror = () => { if (isCurrent()) setFeedback("The voice conversation was interrupted. Tap Start voice to reconnect."); };
       const offer = await pendingPeer.createOffer(); await pendingPeer.setLocalDescription(offer);
       const sdp = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", headers: { Authorization: `Bearer ${ephemeral}`, "Content-Type": "application/sdp" }, body: offer.sdp });
@@ -291,13 +276,13 @@ export default function App() {
     try {
       const tutorial = lookFile ? await extractTutorialFrames(lookFile) : { frames: [], duration: 0 };
       setLookReferenceFrame(tutorial.frames.at(-1) || "");
-      const context = JSON.stringify({ skin:answers.skin || "not provided", tone:answers.tone || "not provided", experience:answers.level || "not provided", goal:answers.goal || "not provided", faceShapeEstimate:shape || "pending and adjustable", availableProducts:ownedProducts, requestedLessonModes:["product-by-product","feature-focus"] });
+      const context = JSON.stringify({ skin:answers.skin || "not provided", tone:answers.tone || "not provided", experience:answers.level || "not provided", goal:answers.goal || "not provided", faceShapeEstimate:shape || "pending and adjustable", availableProducts:ownedProducts, lessonStyle:"One chronological product-by-product lesson. Each product step may cover several precise face areas on the user's own face." });
       const response = await fetch("/api/import-look", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ frames:tutorial.frames, duration:tutorial.duration, description:lookNotes, context, sourceMode:"link" }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       const guide = data as Omit<LookBrief,"time"> & { estimatedMinutes:number };
       setBrief({ ...guide, time:`${guide.estimatedMinutes} min`, sourceUrl, sourceVideoAnalyzed:Boolean(lookFile) });
-      setStep(0); setCompletedFeatures([]); go("look-brief");
+      setStep(0); go("look-brief");
     } catch (error) { setLessonError(error instanceof Error ? error.message : "The personalized lesson could not be created."); }
     finally { setLessonAnalyzing(false); }
   };
@@ -395,11 +380,11 @@ export default function App() {
         </div>
         <section className="lesson-outline">
           <p className="eyebrow">What your bestie learned</p><h2>The tutorial, turned into your lesson.</h2>
-          <div>{brief.steps.map((item,index)=><article key={index}><span>{String(index+1).padStart(2,"0")}</span><div><b>{item.title}</b><p>{item.referenceCue}</p><small>{item.adaptation}{item.uncertain?" · uncertain detail":""}</small></div></article>)}</div>
+          <div>{brief.steps.map((item,index)=><article key={index}><span>{String(index+1).padStart(2,"0")}</span><div><b>{item.product}</b><p>{item.referenceCue}</p><small>{areaSummary(item)}</small><p className="step-checkpoint"><b>Checkpoint:</b> {item.checkpoint}</p>{item.uncertain&&<small>Uncertain tutorial detail</small>}</div></article>)}</div>
         </section>
         <div className="brief-actions">
           <button className="outline" onClick={() => go("studio-intake")}>Edit inspiration</button>
-          <button className="primary" onClick={() => go("preview")}>See my preview & choose studio mode →</button>
+          <button className="primary" onClick={() => go("preview")}>See the tutorial on my face →</button>
         </div>
       </section>
     </main>
@@ -420,7 +405,7 @@ export default function App() {
           <div>
             <p className="eyebrow">Your personalized visualization</p>
             <h1>See the look before you start.</h1>
-            <p>Your facial geometry is mapped privately in the background. No technical markings are shown on this photo.</p>
+            <p>This is the finish your coach will work toward while your own live face stays front and center.</p>
           </div>
           <span>AI visualization · not a guaranteed result</span>
         </div>
@@ -446,7 +431,7 @@ export default function App() {
             <div className="preview-arrow">→</div>
             <div className="preview-column result">
               <small>PERSONALIZED PREVIEW</small>
-              {previewImage ? <div className="feature-preview"><img src={previewImage} alt="AI-generated personalized makeup preview"/>{lessonMode==="feature"&&availableFeatures.map(feature=><button key={feature.id} aria-label={`Open ${feature.label} guide`} className={`${selectedFeature===feature.id?"selected":""} ${completedFeatures.includes(feature.id)?"complete":""}`} style={{left:`${feature.x}%`,top:`${feature.y}%`}} onClick={()=>{setSelectedFeature(feature.id);setStep(0);}}><span>{completedFeatures.includes(feature.id)?"✓":feature.label}</span></button>)}</div> : <div className="preview-placeholder">
+              {previewImage ? <div className="feature-preview"><img src={previewImage} alt="AI-generated personalized makeup preview on your face"/></div> : <div className="preview-placeholder">
                 <i>✦</i>
                 <b>{previewStatus === "generating" ? "Creating your preview…" : "Your makeup preview appears here"}</b>
                 <span>Identity-preserving makeup visualization</span>
@@ -467,16 +452,12 @@ export default function App() {
               {previewStatus === "generating" ? "Generating realistic preview…" : previewImage ? "Regenerate preview" : "Generate my preview"}
             </button>
           </div>
-          <aside className="preview-plan">
-            <p className="eyebrow">Choose your lesson</p>
-            <h2>How do you want to learn?</h2>
-            <button className={lessonMode === "product" ? "lesson-mode selected" : "lesson-mode"} onClick={() => {setLessonMode("product");setStep(0);}}>
-              <span>01</span><div><b>Product-by-product</b><p>Foundation, concealer, contour, blush, eyes, and lips in the tutorial’s order.</p></div>
-            </button>
-            <button className={lessonMode === "feature" ? "lesson-mode selected" : "lesson-mode"} onClick={() => {setLessonMode("feature");setSelectedFeature(availableFeatures[0]?.id||"complexion");setStep(0);}}>
-              <span>02</span><div><b>Feature Focus</b><p>Tap an area on your enhanced preview, then open a live guide focused only on it.</p></div>
-            </button>
-            {lessonMode==="product"?<div className="mode-detail"><small>YOUR ROUTINE</small>{brief.steps.map((item,index)=><span key={`${item.title}-${index}`}><b>{index+1}</b>{item.product}</span>)}</div>:<div className="mode-detail feature-detail"><small>TAP YOUR PREVIEW</small><p>Selected: <b>{featureOptions.find(item=>item.id===selectedFeature)?.label}</b></p><p>The live camera and requested AI checks will focus only on this area.</p></div>}
+          <aside className="preview-plan face-first-plan">
+            <p className="eyebrow">Your face-first lesson</p>
+            <h2>One product at a time.</h2>
+            <p className="face-first-copy">Your tutorial becomes a chronological routine on your face. Every product carries its own areas, placement, and finish checkpoint.</p>
+            <div className="face-first-flow"><span><b>1</b>Tutorial order</span><i>→</i><span><b>2</b>Your placement</span><i>→</i><span><b>3</b>Live check</span></div>
+            <div className="product-timeline"><small>YOUR ROUTINE</small>{brief.steps.map((item,index)=><div key={`${item.title}-${index}`}><b>{String(index+1).padStart(2,"0")}</b><span><strong>{item.product}</strong><small>{areaSummary(item)}</small></span></div>)}</div>
             <div className="preview-summary">
               <small>YOUR COACH ALREADY KNOWS</small>
               <ul>
@@ -490,9 +471,7 @@ export default function App() {
               <input type="checkbox" checked={saveSessionPhotos} onChange={e => setSaveSessionPhotos(e.target.checked)}/>
               <span><b>Save session photos</b><small>Off by default. If left off, preparation and checkpoint photos disappear after the session.</small></span>
             </label>
-            <button className="primary wide" disabled={!previewImage} onClick={() => {setStep(0);go("consent");}}>
-              {lessonMode==="feature"?`Open ${featureOptions.find(item=>item.id===selectedFeature)?.label||"feature"} live guide`:`Start product-by-product routine`} →
-            </button>
+            <button className="primary wide" disabled={!previewImage} onClick={() => {setStep(0);go("consent");}}>Start my face-first lesson →</button>
             {!previewImage&&<button className="outline wide preview-fallback" disabled={!prepPhoto} onClick={()=>{setStep(0);go("consent");}}>Preview unavailable? Continue with my private face map</button>}
           </aside>
         </div>
@@ -505,7 +484,7 @@ export default function App() {
     return <>{nav}<main className="onboarding page-enter"><div className="progress"><span style={{width:`${(onboard+1)*25}%`}} /></div><button className="back" onClick={() => onboard ? setOnboard(onboard-1) : go("home")}>← Back</button><section className="question-card"><p className="eyebrow">{q[1]}</p><h1>{q[2]}</h1><p className="subcopy">This personalizes technique—not your beauty.</p><div className="choice-grid">{q[3].map(o => <button key={o} className={answers[q[0]]===o?"selected":""} onClick={() => setAnswers({...answers,[q[0]]:o})}>{o}<b>{answers[q[0]]===o?"✓":"○"}</b></button>)}</div><button className="primary wide" disabled={!answers[q[0]]} onClick={() => onboard===3?go("face-scan"):setOnboard(onboard+1)}>{onboard===3?"Scan my face":"Continue"} →</button></section></main></>;
   }
 
-  if (view === "consent") return <>{nav}<main className="simple-page page-enter"><section className="consent-card"><p className="eyebrow">Before the camera turns on</p><h1>Your face stays yours.</h1><p>Makeup Bestie uses facial geometry only to guide your {lessonMode==="feature"?(featureOptions.find(item=>item.id===selectedFeature)?.label||"selected feature").toLowerCase():"product-by-product routine"}. Face shape is an adjustable estimate—not a fact about you.</p><div className="privacy-grid"><article><b>On your device</b><p>Continuous landmarks and moving overlays. No camera footage is saved.</p></article><article><b>Only when you ask</b><p>One compressed frame can be sent to OpenAI for a visual makeup check.</p></article><article><b>Your control</b><p>Visible activity labels and an immediate stop-camera button.</p></article></div><label className="check"><input type="checkbox" checked={consent.local} onChange={e=>setConsent({...consent,local:e.target.checked})}/><span><b>Allow on-device face landmarks</b><small>Required for face-aware guides.</small></span></label><label className="check"><input type="checkbox" checked={consent.frames} onChange={e=>setConsent({...consent,frames:e.target.checked})}/><span><b>Allow selected AI frame checks</b><small>Optional. Frames are sent only when you tap “Check my placement.”</small></span></label><label className="check"><input type="checkbox" checked={consent.voice} onChange={e=>setConsent({...consent,voice:e.target.checked})}/><span><b>Allow microphone for voice coaching</b><small>Optional. Starts only when you tap “Start voice.”</small></span></label><button className="primary wide" disabled={!consent.local} onClick={() => go("session")}>Start {lessonMode==="feature"?"focused":"product-by-product"} camera session →</button></section></main></>;
+  if (view === "consent") return <>{nav}<main className="simple-page page-enter"><section className="consent-card"><p className="eyebrow">Before the camera turns on</p><h1>Your face stays yours.</h1><p>Makeup Bestie keeps your own live face on screen and follows the tutorial one product at a time. Facial geometry is used only to adapt each product’s placement, and face shape remains an adjustable estimate.</p><div className="privacy-grid"><article><b>On your device</b><p>Continuous landmarks and moving overlays. No camera footage is saved.</p></article><article><b>Only when you ask</b><p>One compressed frame can be sent to OpenAI for a visual makeup check.</p></article><article><b>Your control</b><p>Visible activity labels and an immediate stop-camera button.</p></article></div><label className="check"><input type="checkbox" checked={consent.local} onChange={e=>setConsent({...consent,local:e.target.checked})}/><span><b>Allow on-device face landmarks</b><small>Required for face-aware guides.</small></span></label><label className="check"><input type="checkbox" checked={consent.frames} onChange={e=>setConsent({...consent,frames:e.target.checked})}/><span><b>Allow selected AI frame checks</b><small>Optional. Frames are sent only when you tap “Check my placement.”</small></span></label><label className="check"><input type="checkbox" checked={consent.voice} onChange={e=>setConsent({...consent,voice:e.target.checked})}/><span><b>Allow microphone for voice coaching</b><small>Optional. Starts only when you tap “Start voice.”</small></span></label><button className="primary wide" disabled={!consent.local} onClick={() => go("session")}>Start my face-first camera lesson →</button></section></main></>;
 
   if (view === "session") {
     const placement = shape ? placementFor(shape) : null;
@@ -513,11 +492,11 @@ export default function App() {
     const personalizedPlacement = placement?.[placementKey] || currentLesson.adaptation;
     const moveToStep = (nextStep:number) => {
       const target = Math.max(0,Math.min(activeLesson.length-1,nextStep));
-      setStep(target); setPlacementVisible(false);
+      setStep(target); setPlacementVisible(false); setTargetVisible(false);
       const item = activeLesson[target];
       if (voiceChannel.current?.readyState==="open") {
-        voiceChannel.current.send(JSON.stringify({ type:"conversation.item.create", item:{ type:"message", role:"user", content:[{ type:"input_text", text:`Move to lesson step ${target+1}: ${item.title}. Tutorial cue: ${item.referenceCue}. Personalized adaptation: ${item.adaptation}.` }] } }));
-        voiceChannel.current.send(JSON.stringify({ type:"response.create", response:{ instructions:"Briefly introduce the next tutorial-specific step and say the user can ask to see placement." } }));
+        voiceChannel.current.send(JSON.stringify({ type:"conversation.item.create", item:{ type:"message", role:"user", content:[{ type:"input_text", text:`Move to product step ${target+1}: ${item.product}. Face areas: ${areaSummary(item)}. Tutorial cue: ${item.referenceCue}. Personalized adaptation: ${item.adaptation}. Checkpoint: ${item.checkpoint}.` }] } }));
+        voiceChannel.current.send(JSON.stringify({ type:"response.create", response:{ instructions:"Briefly introduce the next product and its face areas. Give one instruction, then say the user can ask to see placement." } }));
       }
     };
     const repeatInstruction = () => {
@@ -525,36 +504,39 @@ export default function App() {
       revealPlacement(); setFeedback(currentLesson.instruction);
     };
     const finishSession = () => {
-      if (lessonMode==="feature") setCompletedFeatures(items=>items.includes(selectedFeature)?items:[...items,selectedFeature]);
-      stopCamera(); setPaused(false); setFeedback(lessonMode==="feature"?`${featureOptions.find(item=>item.id===selectedFeature)?.label} focus complete. Choose another area whenever you’re ready.`:"Routine complete. Your camera and microphone are off."); go("preview");
+      stopCamera(); setPaused(false); setTargetVisible(false); setFeedback("Routine complete. Your camera and microphone are off."); go("preview");
     };
     return <>
       {nav}
       <main className="studio page-enter">
         <div className="studio-heading">
-          <div><p className="eyebrow">{lessonMode==="feature"?`${featureOptions.find(item=>item.id===selectedFeature)?.label} focus`:`Product-by-product routine`}</p><h1>{brief?.title || "Your personalized lesson"}</h1></div>
+          <div><p className="eyebrow">Your face · Product {step+1} of {activeLesson.length}</p><h1>{brief?.title || "Your personalized lesson"}</h1></div>
           <div className={`live-pill ${camera}`}><i /> {camera==="tracking"?"Local tracking active":camera==="starting"?"Loading landmarks…":camera==="no-face"?"No face detected":camera==="denied"?"Permission denied":"Camera off"}</div>
         </div>
         <div className="studio-grid">
           <section className="camera-card">
             <video ref={video} autoPlay muted playsInline/><canvas ref={canvas} className="face-overlay"/>
+            {previewImage&&targetVisible&&<div className="live-target"><div><small>YOUR FINISHED TARGET</small><b>{currentLesson.product}</b><span>{areaSummary(currentLesson)}</span></div><img src={previewImage} alt="Your personalized finished-look target"/></div>}
             <div className="camera-fallback"><div className="face-shape">♡</div><p>{feedback}</p>{(camera==="denied"||camera==="error"||camera==="off")&&<button className="cream-button" onClick={startCamera}>Retry camera</button>}</div>
             <div className="camera-top"><span>{camera==="tracking"?"CAMERA + LOCAL AI":"CAMERA OFF"}</span><span>{placementVisible?"PLACEMENT HIGHLIGHT ACTIVE":consent.frames?"Frame sharing: ask only":"Frames never shared"}</span></div>
             <div className="bestie-bubble"><div className="avatar small">M</div><p><b>Makeup Bestie</b><br/>{feedback}</p></div>
           </section>
           <aside className="lesson-card">
-            <div className="lesson-progress"><span>Step {step+1} of {activeLesson.length}</span><span>{lessonMode==="feature"?"Focused live guide":"Product order"}</span></div>
+            <div className="lesson-progress"><span>Product {step+1} of {activeLesson.length}</span><span>On your face</span></div>
             <div className="dots">{activeLesson.map((_,index)=><i key={index} className={index<=step?"active":""}/>)}</div>
-            <p className="eyebrow">Now we’re doing</p><h2>{currentLesson.title}</h2>
+            <p className="eyebrow">Now we’re using</p><h2>{currentLesson.product}</h2>
+            <div className="area-chips">{stepAreas(currentLesson).map(area=><span key={area}>{areaLabels[area]}</span>)}</div>
             <p className="instruction">{currentLesson.instruction}</p>
             <div className="tutorial-cue"><small>FROM YOUR TUTORIAL</small><p>{currentLesson.referenceCue}</p></div>
             {brief?.sourceUrl&&<a className="studio-source-link" href={brief.sourceUrl} target="_blank" rel="noopener noreferrer">Open original tutorial ↗</a>}
+            <div className="step-target"><small>THIS STEP IS READY WHEN</small><p>{currentLesson.checkpoint}</p></div>
             {shape&&<div className="face-result"><small>ADJUSTABLE ESTIMATE</small><p>Your proportions appear closest to <b>{shape}-shaped</b>.</p><select aria-label="Correct face shape" value={shape} onChange={event=>setShape(event.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(item=><option key={item}>{item}</option>)}</select><p>{personalizedPlacement}</p></div>}
             <div className="session-actions">
               <button className="outline placement-button" onClick={revealPlacement} disabled={camera!=="tracking"}>{placementVisible?"Highlighting placement…":"Show me where"}</button>
+              {previewImage&&<button className="outline" onClick={()=>setTargetVisible(!targetVisible)}>{targetVisible?"Hide my target":"See the finished target on my face"}</button>}
               {consent.frames&&<button className="outline" onClick={aiCheck} disabled={checking||camera!=="tracking"}>{checking?"Checking one frame…":"Check my placement"}</button>}
               {consent.voice&&!voiceActive&&<button className="outline" onClick={startVoice} disabled={voiceConnecting}>{voiceConnecting?"Connecting one coach…":"Start voice"}</button>}
-              {step===activeLesson.length-1?<button className="primary wide" onClick={finishSession}>{lessonMode==="feature"?`Finish ${featureOptions.find(item=>item.id===selectedFeature)?.label||"area"} ✓`:"Finish routine ✓"}</button>:<button className="primary wide" onClick={()=>moveToStep(step+1)}>Next product →</button>}
+              {step===activeLesson.length-1?<button className="primary wide" onClick={finishSession}>Finish routine ✓</button>:<button className="primary wide" onClick={()=>moveToStep(step+1)}>This product is done →</button>}
             </div>
             <div className="lesson-controls">
               <button onClick={()=>moveToStep(step-1)}>↶ Back</button>
