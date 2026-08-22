@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
   const reference = form.get("reference");
   const description = String(form.get("description") || "personalized makeup look");
   const intensity = String(form.get("intensity") || "reference");
-  if (!(face instanceof File) || !face.type.startsWith("image/") || face.size > 8_000_000)
-    return NextResponse.json({ error: "Choose a JPG, PNG, or WebP bare-face photo under 8 MB." }, { status: 400 });
+  if (!(face instanceof File) || !face.type.startsWith("image/") || face.size > 3_500_000)
+    return NextResponse.json({ error: "Choose a JPG, PNG, or WebP bare-face photo under 3.5 MB for preview generation." }, { status: 400 });
   const body = new FormData();
   body.append("model", process.env.OPENAI_IMAGE_MODEL || "gpt-image-2");
   body.append("image[]", face, "bare-face.jpg");
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   try {
     const response = await fetch("https://api.openai.com/v1/images/edits", { method:"POST", headers:{ Authorization:`Bearer ${key}` }, body });
     const data = await response.json();
-    if (!response.ok) return NextResponse.json({ error:data?.error?.message || "Preview generation is temporarily unavailable." }, { status:response.status });
+    if (!response.ok) return NextResponse.json({ error:response.status===429?"Preview generation usage limit reached. Wait a moment before trying again.":data?.error?.message || "Preview generation is temporarily unavailable." }, { status:response.status });
     const encoded = data?.data?.[0]?.b64_json;
     if (!encoded) return NextResponse.json({ error:"The preview could not be generated." }, { status:502 });
     return NextResponse.json({ image:`data:image/png;base64,${encoded}` });

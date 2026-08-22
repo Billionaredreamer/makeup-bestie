@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       })
     });
     const data = await response.json();
-    if (!response.ok) return NextResponse.json({ error: data?.error?.message || "Tutorial analysis failed." }, { status: response.status });
+    if (!response.ok) return NextResponse.json({ error: response.status===429 ? "Tutorial analysis usage limit reached. Wait a moment or try a shorter tutorial." : data?.error?.message || "Tutorial analysis failed." }, { status: response.status });
     try {
       const lesson = JSON.parse(responseText(data));
       lesson.analysisScope = `Analyzed ${frames.length} ordered frames sampled across the uploaded ${Math.round(duration)}-second tutorial, then adapted the observed sequence to the supplied face estimate, skin preferences, experience, and makeup bag.`;

@@ -9,12 +9,11 @@ const waitFor = (target: HTMLMediaElement, event: string, timeout = 12_000) => n
   target.addEventListener("error", failed, { once: true });
 });
 
-export async function extractTutorialFrames(file: File, count = 10): Promise<TutorialFrames> {
-  if (!file.type.startsWith("video/")) throw new Error("Choose an MP4, WebM, or MOV tutorial video.");
-  const url = URL.createObjectURL(file);
+async function extractFromSource(url:string, count:number, cleanup:()=>void):Promise<TutorialFrames> {
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
+  video.crossOrigin = "anonymous";
   video.preload = "metadata";
   video.src = url;
   try {
@@ -38,6 +37,18 @@ export async function extractTutorialFrames(file: File, count = 10): Promise<Tut
     }
     return { frames, sampleTimes, duration: video.duration };
   } finally {
-    video.pause(); video.removeAttribute("src"); video.load(); URL.revokeObjectURL(url);
+    video.pause(); video.removeAttribute("src"); video.load(); cleanup();
   }
+}
+
+export async function extractTutorialFrames(file: File, count = 10): Promise<TutorialFrames> {
+  if (!file.type.startsWith("video/")) throw new Error("Choose an MP4, WebM, or MOV tutorial video.");
+  const url = URL.createObjectURL(file);
+  return extractFromSource(url,count,()=>URL.revokeObjectURL(url));
+}
+
+export async function extractTutorialFramesFromUrl(url:string,count=10):Promise<TutorialFrames> {
+  if(!url.startsWith("/api/tutorial-media?")) throw new Error("The tutorial link did not produce a safe video stream.");
+  try { return await extractFromSource(url,count,()=>{}); }
+  catch(error) { throw new Error(error instanceof Error?`${error.message} Upload a permitted video copy instead.`:"The linked tutorial could not be read. Upload a permitted video copy instead."); }
 }

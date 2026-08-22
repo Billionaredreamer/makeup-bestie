@@ -483,6 +483,7 @@
 .lesson-mode-picker button { display: grid; gap: 5px; padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: white; color: var(--brown); text-align: left; }
 .lesson-mode-picker button.selected { border-color: var(--rose); background: #fff2ec; box-shadow: inset 0 0 0 1px var(--rose); }
 .lesson-mode-picker button b { font: 16px Georgia, serif; }
+.lesson-mode-picker button b small { margin-left: 5px; color: var(--rose); font: 7px Arial, sans-serif; letter-spacing: .11em; }
 .lesson-mode-picker button span { color: var(--muted); font-size: 9px; line-height: 1.4; }
 
 .glam-room { max-width: 1240px; margin: auto; padding: 62px 28px 90px; }
@@ -498,6 +499,7 @@
 .placement-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; color: #d77e80; }
 .placement-overlay .placement-zone { fill: currentColor; fill-opacity: .3; stroke: rgba(255,255,255,.95); stroke-width: .004; stroke-dasharray: .014 .009; filter: drop-shadow(0 0 9px currentColor); animation: placement-breathe 2.2s ease-in-out infinite; }
 .placement-overlay .application-arrow { fill: none; stroke: white; stroke-width: .008; stroke-linecap: round; stroke-dasharray: .035 .018; animation: arrow-travel 1.25s linear infinite; }
+.placement-overlay.completed-placement .placement-zone { fill-opacity: .1; stroke-opacity: .28; stroke-dasharray: none; filter: none; animation: none; }
 .placement-overlay marker path { fill: white; }
 .placement-overlay.technique-contour { color: #7e4939; }
 .placement-overlay.technique-blush { color: #e68691; }
@@ -514,6 +516,16 @@
 .placement-key small { opacity: .77; font-size: 8px; }
 .glam-face-caption { display: flex; justify-content: space-between; gap: 15px; padding: 13px 18px; background: #fffaf4; color: var(--muted); font-size: 9px; text-transform: capitalize; }
 .glam-face-caption b { color: var(--rose); }
+.glam-visual-pair { display: grid; background: #2f211d; }
+.glam-visual-pair.mirror-open { grid-template-columns: 1fr 1fr; gap: 2px; align-items: stretch; }
+.glam-visual-pair.mirror-open .glam-face { align-self: center; }
+.routine-transport { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 13px 18px; background: white; border-top: 1px solid var(--line); }
+.routine-transport button { border: 0; background: none; color: var(--rose); font-size: 10px; font-weight: 800; }
+.routine-transport > div { overflow: hidden; height: 4px; border-radius: 99px; background: #eadfd7; }
+.routine-transport > div span { display: block; width: 0; height: 100%; background: var(--rose); }
+.routine-transport > div span.playing { animation: routine-progress 6s linear forwards; }
+.routine-transport small { color: var(--muted); font-size: 8px; }
+@keyframes routine-progress { to { width: 100%; } }
 
 .glam-lesson-card { padding: 25px; border: 1px solid var(--line); border-radius: 28px; background: white; }
 .glam-lesson-card h2 { margin: 0 0 12px; font: 36px/1.05 Georgia, serif; }
@@ -536,6 +548,14 @@
 .finished-mini span { display: grid; gap: 4px; }
 .finished-mini small { color: var(--rose); font-size: 7px; letter-spacing: .12em; }
 .finished-mini b { font: 15px Georgia, serif; }
+.uncertain-step { display: grid; gap: 3px; margin: 12px 0; padding: 12px; border-radius: 13px; background: #fff7e8; color: #765124; }
+.uncertain-step b { font-size: 10px; }
+.uncertain-step span { font-size: 9px; line-height: 1.45; }
+.mirror-option { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin: 13px 0; padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: var(--cream); }
+.mirror-option > div { display: grid; gap: 4px; }
+.mirror-option b { font: 15px Georgia, serif; }
+.mirror-option span { color: var(--muted); font-size: 8px; line-height: 1.4; }
+.mirror-option button { white-space: nowrap; }
 .glam-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 15px; }
 .glam-actions .primary { box-shadow: none; }
 .glam-actions button:disabled { opacity: .35; cursor: not-allowed; }
@@ -552,6 +572,16 @@
 .available-list { display: grid; gap: 7px; margin-top: 20px; }
 .available-list button { display: flex; justify-content: space-between; padding: 13px 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--cream); color: var(--brown); text-align: left; }
 .available-list button span { color: var(--rose); }
+.silent-mirror { position: relative; min-height: 420px; overflow: hidden; background: #1f1613; }
+.silent-mirror > video { display: block; width: 100%; height: 100%; min-height: 420px; object-fit: cover; transform: scaleX(-1); }
+.silent-mirror > .placement-overlay { transform: scaleX(-1); }
+.mirror-status { position: absolute; z-index: 4; top: 12px; left: 12px; right: 12px; display: flex; align-items: center; gap: 7px; padding: 9px 11px; border-radius: 12px; background: rgba(43,27,23,.78); color: white; font-size: 8px; backdrop-filter: blur(8px); }
+.mirror-status i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: #dca74e; }
+.mirror-status.active i { background: #58a36c; }
+.mirror-status.denied i,.mirror-status.error i { background: #d45b4e; }
+.mirror-retry,.mirror-close { position: absolute; z-index: 5; bottom: 13px; border: 1px solid rgba(255,255,255,.55); border-radius: 99px; padding: 9px 12px; background: rgba(43,27,23,.78); color: white; font-size: 8px; font-weight: 700; }
+.mirror-close { right: 13px; }
+.mirror-retry { left: 13px; }
 
 @media (max-width: 900px) {
   .glam-grid { grid-template-columns: 1fr; }
@@ -569,4 +599,7 @@
   .lesson-mode-picker { grid-template-columns: 1fr; }
   .lesson-mode-picker > small { grid-column: 1; }
   .feature-picker,.feature-picker > img { min-height: 480px; }
+  .glam-visual-pair.mirror-open { grid-template-columns: 1fr; }
+  .silent-mirror,.silent-mirror > video { min-height: 420px; }
+  .mirror-option { grid-template-columns: 1fr; }
 }
