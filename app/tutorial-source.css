@@ -37,6 +37,32 @@
 
 .required-upload { margin: 0; border-style: solid; }
 
+.analysis-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+}
+
+.analysis-progress > i {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 2px solid var(--blush);
+  border-top-color: var(--rose);
+  border-radius: 50%;
+  animation: analysis-spin .8s linear infinite;
+}
+
+.analysis-progress span { display: grid; gap: 3px; }
+.analysis-progress small { color: var(--muted); font-size: 10px; }
+
+@keyframes analysis-spin { to { transform: rotate(360deg); } }
+
 .saved-source {
   display: flex;
   align-items: center;

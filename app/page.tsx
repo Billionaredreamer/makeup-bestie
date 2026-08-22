@@ -53,6 +53,7 @@ export default function App() {
   const [lookFile, setLookFile] = useState<File | null>(null);
   const [lookReferenceFrame, setLookReferenceFrame] = useState("");
   const [lessonAnalyzing, setLessonAnalyzing] = useState(false);
+  const [lessonStage, setLessonStage] = useState("");
   const [lessonError, setLessonError] = useState("");
   const [brief, setBrief] = useState<LookBrief | null>(null);
   const [ownedProducts, setOwnedProducts] = useState<string[]>([]);
@@ -210,19 +211,24 @@ export default function App() {
     const sourceUrl = normalizeTutorialUrl(lookUrl);
     if (!sourceUrl) { setLessonError("Paste a complete tutorial link beginning with http:// or https://."); return; }
     if (!lookFile) { setLessonError("Add the tutorial video file so Makeup Bestie can analyze the actual sequence. A social link alone cannot provide reliable video frames."); return; }
-    setLessonAnalyzing(true); setLessonError("");
+    setLessonAnalyzing(true); setLessonError(""); setLessonStage("Reading the tutorial video on your device…");
     try {
       const tutorial = await extractTutorialFrames(lookFile, 14);
+      setLessonStage(`Uploading ${tutorial.frames.length} timeline samples for visual analysis…`);
       setLookReferenceFrame(tutorial.frames.at(-1) || "");
       const context = JSON.stringify({ skin:answers.skin || "not provided", tone:answers.tone || "not provided", experience:answers.level || "not provided", goal:answers.goal || "not provided", faceShapeEstimate:shape || "pending and adjustable", availableProducts:ownedProducts, lessonStyle:"One chronological product-by-product lesson. Each product step may cover several precise face areas on the user's own face." });
-      const response = await fetch("/api/import-look", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ frames:tutorial.frames, duration:tutorial.duration, description:lookNotes, context }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      const response = await fetch("/api/import-look", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ frames:tutorial.frames, duration:tutorial.duration, description:lookNotes, context }), signal:AbortSignal.timeout(75_000) });
+      const raw = await response.text();
+      let data: Record<string, unknown>;
+      try { data = JSON.parse(raw); }
+      catch { throw new Error(response.status === 413 ? "The tutorial upload is still too large. Try a shorter or lower-resolution video." : `Tutorial analysis stopped on the server (${response.status}). Please try again.`); }
+      if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Tutorial analysis failed. Please try again.");
+      setLessonStage("Turning the analyzed sequence into your personalized steps…");
       const guide = data as Omit<LookBrief,"time"> & { estimatedMinutes:number };
       setBrief({ ...guide, time:`${guide.estimatedMinutes} min`, sourceUrl, sourceVideoAnalyzed:true });
       setStep(0); go("look-brief");
-    } catch (error) { setLessonError(error instanceof Error ? error.message : "The personalized lesson could not be created."); }
-    finally { setLessonAnalyzing(false); }
+    } catch (error) { setLessonError(error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError") ? "Tutorial analysis took too long. Please retry once; if it repeats, use a shorter tutorial." : error instanceof Error ? error.message : "The personalized lesson could not be created."); }
+    finally { setLessonAnalyzing(false); setLessonStage(""); }
   };
 
   if (view === "face-scan") return <>
@@ -287,6 +293,7 @@ export default function App() {
           <div className="product-options">{productOptions.map(product=><label key={product} className={ownedProducts.includes(product)?"selected":""}><input type="checkbox" checked={ownedProducts.includes(product)} onChange={event=>setOwnedProducts(event.target.checked?[...ownedProducts,product]:ownedProducts.filter(item=>item!==product))}/><span>{product}</span><b>{ownedProducts.includes(product)?"✓":"+"}</b></label>)}</div>
         </section>
         <p className="honest-note"><b>No pretend analysis:</b> The link stays with your lesson, but social platforms do not reliably expose their video frames. Makeup Bestie creates the lesson only after analyzing the attached video from beginning to end.</p>
+        {lessonAnalyzing&&<div className="analysis-progress" role="status"><i/><span><b>Analyzing your tutorial</b><small>{lessonStage}</small></span></div>}
         {lessonError && <p className="error">{lessonError}</p>}
         <button className="primary intake-continue" disabled={lessonAnalyzing || !lookUrl.trim() || !lookFile} onClick={createBrief}>
           {lessonAnalyzing ? "Studying every stage of the tutorial…" : "Analyze tutorial & create my lesson →"}

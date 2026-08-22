@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 /* eslint-disable @typescript-eslint/no-explicit-any -- OpenAI REST response items are narrowed by runtime type tags */
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const regions = ["all-face","complexion","forehead","both-cheeks","left-cheek","right-cheek","both-eyes","left-eye","right-eye","brows","nose","lips","jaw","none"];
 const techniques = ["prep","base","conceal","contour","blush","highlight","eyes","eyeliner","brow","lips","finish"];
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: process.env.OPENAI_VISION_MODEL || "gpt-5.6-luna", max_output_tokens: 6400, store: false, reasoning: { effort: "low" },
+      body: JSON.stringify({ model: process.env.OPENAI_VISION_MODEL || "gpt-5.4-mini", max_output_tokens: 6400, store: false, reasoning: { effort: "low" },
         text: { verbosity: "low", format: { type: "json_schema", name: "personalized_makeup_lesson", strict: true, schema } },
         input: [{ role: "user", content: [
           { type: "input_text", text: `Turn this into one concise chronological, product-by-product makeup lesson with 6-14 steps. ${sourceExplanation}\nUser request: ${description || "Recreate the visibly demonstrated tutorial style."}\nUser context: ${context}\nFirst identify the visible progression between ordered frames, then adapt that exact routine to the user's facial proportions, skin preference, skill level, and available products in the supplied context. Never default to a generic full-face routine. Preserve the tutorial's observed product order. Make each step one product or one distinct application pass; if the same product is used twice with a different shade, purpose, or face area, keep those as separate steps. Set region to the primary area and areas to every face area affected in that step. Use product categories rather than invented brands, use available products when possible, and suggest simple category substitutes. Put specific visible tutorial evidence in referenceCue, face/skin/skill personalization in adaptation, and one visually checkable completion condition in checkpoint. Creator annotations such as arrows, circles, X marks, captions, and watermarks are evidence only and must never become part of the makeup result. Treat face shape as an adjustable estimate. Flag unsupported shades, products, spoken-only details, or hidden steps as uncertain. Keep the summary and adaptation under three short sentences, and every step field to one practical sentence.` },
