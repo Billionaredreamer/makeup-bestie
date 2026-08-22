@@ -470,3 +470,103 @@
   .live-target { top: 55px; right: 10px; width: 128px; }
   .live-target img { height: 92px; }
 }
+
+/* Personalized, camera-free Glam Room */
+.lesson-mode-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.lesson-mode-picker > small { grid-column: 1 / -1; color: var(--rose); font-size: 8px; letter-spacing: .13em; }
+.lesson-mode-picker button { display: grid; gap: 5px; padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: white; color: var(--brown); text-align: left; }
+.lesson-mode-picker button.selected { border-color: var(--rose); background: #fff2ec; box-shadow: inset 0 0 0 1px var(--rose); }
+.lesson-mode-picker button b { font: 16px Georgia, serif; }
+.lesson-mode-picker button span { color: var(--muted); font-size: 9px; line-height: 1.4; }
+
+.glam-room { max-width: 1240px; margin: auto; padding: 62px 28px 90px; }
+.glam-heading { display: flex; justify-content: space-between; align-items: end; gap: 30px; margin-bottom: 26px; }
+.glam-heading h1 { margin: 0; font: 400 clamp(38px, 5vw, 58px)/1 Georgia, serif; }
+.glam-heading > div:first-child > p:last-child { margin: 12px 0 0; color: var(--muted); font: 13px/1.5 Georgia, serif; }
+.offline-pill { flex: 0 0 auto; padding: 10px 14px; border-radius: 99px; background: #f2e8e2; color: var(--brown); font-size: 11px; }
+.offline-pill i { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #58a36c; }
+.glam-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr); gap: 22px; align-items: start; }
+.glam-face-card { overflow: hidden; border: 1px solid var(--line); border-radius: 28px; background: #2f211d; box-shadow: 0 24px 65px rgba(56,35,29,.13); }
+.glam-face { position: relative; width: 100%; max-height: 760px; margin: auto; background: #2f211d; }
+.glam-face > img { display: block; width: 100%; height: 100%; object-fit: fill; }
+.placement-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; color: #d77e80; }
+.placement-overlay .placement-zone { fill: currentColor; fill-opacity: .3; stroke: rgba(255,255,255,.95); stroke-width: .004; stroke-dasharray: .014 .009; filter: drop-shadow(0 0 9px currentColor); animation: placement-breathe 2.2s ease-in-out infinite; }
+.placement-overlay .application-arrow { fill: none; stroke: white; stroke-width: .008; stroke-linecap: round; stroke-dasharray: .035 .018; animation: arrow-travel 1.25s linear infinite; }
+.placement-overlay marker path { fill: white; }
+.placement-overlay.technique-contour { color: #7e4939; }
+.placement-overlay.technique-blush { color: #e68691; }
+.placement-overlay.technique-highlight { color: #e8c276; }
+.placement-overlay.technique-eyes,.placement-overlay.technique-eyeliner { color: #8f688c; }
+.placement-overlay.technique-brow { color: #704d42; }
+.placement-overlay.technique-lips { color: #ad4d58; }
+.placement-overlay.technique-base,.placement-overlay.technique-conceal,.placement-overlay.technique-prep { color: #e0ad91; }
+@keyframes placement-breathe { 50% { fill-opacity: .43; } }
+@keyframes arrow-travel { to { stroke-dashoffset: -.106; } }
+.placement-key { position: absolute; left: 18px; bottom: 18px; display: grid; grid-template-columns: 10px auto; gap: 2px 8px; max-width: calc(100% - 36px); padding: 11px 14px; border: 1px solid rgba(255,255,255,.35); border-radius: 14px; background: rgba(43,27,23,.76); color: white; backdrop-filter: blur(10px); }
+.placement-key > span { grid-row: 1 / 3; align-self: center; width: 10px; height: 10px; border-radius: 50%; background: #e68691; box-shadow: 0 0 0 5px rgba(230,134,145,.2); }
+.placement-key b { font: 15px Georgia, serif; }
+.placement-key small { opacity: .77; font-size: 8px; }
+.glam-face-caption { display: flex; justify-content: space-between; gap: 15px; padding: 13px 18px; background: #fffaf4; color: var(--muted); font-size: 9px; text-transform: capitalize; }
+.glam-face-caption b { color: var(--rose); }
+
+.glam-lesson-card { padding: 25px; border: 1px solid var(--line); border-radius: 28px; background: white; }
+.glam-lesson-card h2 { margin: 0 0 12px; font: 36px/1.05 Georgia, serif; }
+.glam-mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 24px; padding: 5px; border-radius: 99px; background: var(--cream); }
+.glam-mode-toggle button { border: 0; border-radius: 99px; padding: 10px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 700; }
+.glam-mode-toggle button.selected { background: white; color: var(--rose); box-shadow: 0 4px 14px rgba(56,35,29,.08); }
+.change-feature { margin: -30px 0 20px; border: 0; background: none; color: var(--rose); padding: 0; font-size: 9px; font-weight: 700; }
+.personalized-direction { margin: 13px 0; padding: 14px; border-radius: 14px; background: #fff0ea; }
+.personalized-direction small { color: var(--rose); font-size: 8px; letter-spacing: .13em; }
+.personalized-direction p { margin: 7px 0 0; color: var(--brown); font: 12px/1.5 Georgia, serif; }
+.tutorial-clip { overflow: hidden; margin: 14px 0; border: 1px solid var(--line); border-radius: 16px; background: #281a17; }
+.tutorial-clip > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: white; }
+.tutorial-clip span { display: grid; gap: 2px; }
+.tutorial-clip span b { color: var(--rose); font-size: 8px; letter-spacing: .12em; }
+.tutorial-clip span small { color: var(--muted); font-size: 8px; }
+.tutorial-clip button { border: 0; background: none; color: var(--rose); font-size: 9px; font-weight: 700; }
+.tutorial-clip video { display: block; width: 100%; max-height: 250px; background: #1e1412; }
+.finished-mini { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center; margin: 13px 0; padding: 9px; border: 1px solid var(--line); border-radius: 14px; }
+.finished-mini img { width: 64px; height: 72px; border-radius: 10px; object-fit: cover; }
+.finished-mini span { display: grid; gap: 4px; }
+.finished-mini small { color: var(--rose); font-size: 7px; letter-spacing: .12em; }
+.finished-mini b { font: 15px Georgia, serif; }
+.glam-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 15px; }
+.glam-actions .primary { box-shadow: none; }
+.glam-actions button:disabled { opacity: .35; cursor: not-allowed; }
+
+.feature-picker { position: relative; width: 100%; min-height: 600px; background: #2f211d; }
+.feature-picker > img { display: block; width: 100%; height: 100%; min-height: 600px; object-fit: cover; opacity: .86; }
+.feature-picker > button { position: absolute; transform: translate(-50%,-50%); width: 44px; height: 44px; border: 1px solid rgba(255,255,255,.95); border-radius: 50%; background: rgba(168,86,68,.7); box-shadow: 0 0 0 9px rgba(244,211,198,.22); color: white; animation: feature-pulse 2s ease-in-out infinite; }
+.feature-picker > button span { position: absolute; top: calc(100% + 7px); left: 50%; transform: translateX(-50%); padding: 5px 8px; border-radius: 99px; background: rgba(43,27,23,.86); white-space: nowrap; font-size: 8px; }
+@keyframes feature-pulse { 50% { box-shadow: 0 0 0 14px rgba(244,211,198,.13); } }
+.picker-message { position: absolute; top: 18px; left: 18px; right: 18px; display: grid; gap: 4px; padding: 13px 15px; border-radius: 14px; background: rgba(255,250,244,.92); color: var(--brown); backdrop-filter: blur(10px); }
+.picker-message b { font: 17px Georgia, serif; }
+.picker-message span { color: var(--muted); font-size: 9px; }
+.feature-welcome > p:not(.eyebrow) { color: var(--muted); font: 13px/1.6 Georgia, serif; }
+.available-list { display: grid; gap: 7px; margin-top: 20px; }
+.available-list button { display: flex; justify-content: space-between; padding: 13px 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--cream); color: var(--brown); text-align: left; }
+.available-list button span { color: var(--rose); }
+
+@media (max-width: 900px) {
+  .glam-grid { grid-template-columns: 1fr; }
+  .glam-lesson-card { order: 2; }
+  .glam-face-card { max-width: 680px; margin: auto; }
+}
+
+@media (max-width: 600px) {
+  .glam-room { padding: 35px 14px 70px; }
+  .glam-heading { display: block; }
+  .offline-pill { display: inline-block; margin-top: 12px; }
+  .glam-lesson-card { padding: 20px 16px; }
+  .glam-lesson-card h2 { font-size: 31px; }
+  .glam-actions { grid-template-columns: 1fr; }
+  .lesson-mode-picker { grid-template-columns: 1fr; }
+  .lesson-mode-picker > small { grid-column: 1; }
+  .feature-picker,.feature-picker > img { min-height: 480px; }
+}

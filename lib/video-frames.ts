@@ -1,4 +1,4 @@
-export type TutorialFrames = { frames: string[]; duration: number };
+export type TutorialFrames = { frames: string[]; sampleTimes: number[]; duration: number };
 
 const waitFor = (target: HTMLMediaElement, event: string, timeout = 12_000) => new Promise<void>((resolve, reject) => {
   const timer = window.setTimeout(() => { cleanup(); reject(new Error("The tutorial video could not be read.")); }, timeout);
@@ -28,13 +28,15 @@ export async function extractTutorialFrames(file: File, count = 10): Promise<Tut
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Video frame extraction is unavailable in this browser.");
     const frames: string[] = [];
+    const sampleTimes: number[] = [];
     for (let index = 0; index < samples; index += 1) {
       const time = Math.min(video.duration - 0.05, ((index + 0.5) / samples) * video.duration);
       if (Math.abs(video.currentTime - time) > 0.01) { video.currentTime = time; await waitFor(video, "seeked"); }
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       frames.push(canvas.toDataURL("image/jpeg", 0.68));
+      sampleTimes.push(Number(time.toFixed(2)));
     }
-    return { frames, duration: video.duration };
+    return { frames, sampleTimes, duration: video.duration };
   } finally {
     video.pause(); video.removeAttribute("src"); video.load(); URL.revokeObjectURL(url);
   }
