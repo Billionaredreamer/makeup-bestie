@@ -482,7 +482,8 @@
 .glam-heading h1 { margin: 0; font: 400 clamp(38px, 5vw, 58px)/1 Georgia, serif; }
 .glam-heading > div:first-child > p:last-child { margin: 12px 0 0; color: var(--muted); font: 13px/1.5 Georgia, serif; }
 .offline-pill { flex: 0 0 auto; padding: 10px 14px; border-radius: 99px; background: #f2e8e2; color: var(--brown); font-size: 11px; }
-.offline-pill i { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #58a36c; }
+.offline-pill i { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #b27b47; }
+.offline-pill.active i { background: #58a36c; }
 .glam-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr); gap: 22px; align-items: start; }
 .glam-face-card { overflow: hidden; border: 1px solid var(--line); border-radius: 28px; background: #2f211d; box-shadow: 0 24px 65px rgba(56,35,29,.13); }
 .glam-face { position: relative; width: 100%; max-height: 760px; margin: auto; background: #2f211d; }
@@ -549,9 +550,16 @@
 .placement-key small { opacity: .77; font-size: 8px; }
 .glam-face-caption { display: flex; justify-content: space-between; gap: 15px; padding: 13px 18px; background: #fffaf4; color: var(--muted); font-size: 9px; text-transform: capitalize; }
 .glam-face-caption b { color: var(--rose); }
-.glam-visual-pair { display: grid; background: #2f211d; }
-.glam-visual-pair.mirror-open { grid-template-columns: 1fr 1fr; gap: 2px; align-items: stretch; }
-.glam-visual-pair.mirror-open .glam-face { align-self: center; }
+.feature-mirror-stage { position: relative; overflow: hidden; background: #1f1613; }
+.feature-mirror-stage > .silent-mirror { width: 100%; }
+.animated-guide-pip { position: absolute; z-index: 6; top: 56px; right: 16px; width: clamp(150px, 30%, 230px); overflow: hidden; border: 2px solid rgba(255,250,244,.9); border-radius: 18px; background: #2f211d; box-shadow: 0 18px 45px rgba(20,12,10,.45); }
+.animated-guide-title { position: relative; z-index: 5; display: grid; gap: 2px; padding: 9px 11px; background: rgba(255,250,244,.95); color: var(--brown); }
+.animated-guide-title span { color: var(--rose); font-size: 7px; font-weight: 800; letter-spacing: .12em; }
+.animated-guide-title b { overflow: hidden; font: 13px Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
+.animated-guide-pip .compact-guide { max-height: none; }
+.animated-guide-pip .zone-badge b { width: 16px; height: 16px; font-size: 8px; }
+.animated-guide-pip .zone-badge small { display: none; }
+.pip-motion-toggle { position: absolute; z-index: 8; right: 8px; bottom: 8px; border: 1px solid rgba(255,255,255,.55); border-radius: 99px; padding: 6px 8px; background: rgba(43,27,23,.78); color: white; font-size: 7px; font-weight: 700; backdrop-filter: blur(8px); }
 .glam-lesson-card { padding: 25px; border: 1px solid var(--line); border-radius: 28px; background: white; }
 .glam-lesson-card h2 { margin: 0 0 12px; font: 36px/1.05 Georgia, serif; }
 .change-feature { margin: -30px 0 20px; border: 0; background: none; color: var(--rose); padding: 0; font-size: 9px; font-weight: 700; }
@@ -590,9 +598,6 @@
 .feature-picker > button { position: absolute; transform: translate(-50%,-50%); width: 44px; height: 44px; border: 1px solid rgba(255,255,255,.95); border-radius: 50%; background: rgba(168,86,68,.7); box-shadow: 0 0 0 9px rgba(244,211,198,.22); color: white; animation: feature-pulse 2s ease-in-out infinite; }
 .feature-picker > button span { position: absolute; top: calc(100% + 7px); left: 50%; transform: translateX(-50%); padding: 5px 8px; border-radius: 99px; background: rgba(43,27,23,.86); white-space: nowrap; font-size: 8px; }
 @keyframes feature-pulse { 50% { box-shadow: 0 0 0 14px rgba(244,211,198,.13); } }
-.picker-message { position: absolute; top: 18px; left: 18px; right: 18px; display: grid; gap: 4px; padding: 13px 15px; border-radius: 14px; background: rgba(255,250,244,.92); color: var(--brown); backdrop-filter: blur(10px); }
-.picker-message b { font: 17px Georgia, serif; }
-.picker-message span { color: var(--muted); font-size: 9px; }
 .feature-welcome > p:not(.eyebrow) { color: var(--muted); font: 13px/1.6 Georgia, serif; }
 .available-list { display: grid; gap: 7px; margin-top: 20px; }
 .available-list button { display: flex; justify-content: space-between; padding: 13px 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--cream); color: var(--brown); text-align: left; }
@@ -624,7 +629,9 @@
   .glam-lesson-card h2 { font-size: 31px; }
   .glam-actions { grid-template-columns: 1fr; }
   .feature-picker,.feature-picker > img { min-height: 480px; }
-  .glam-visual-pair.mirror-open { grid-template-columns: 1fr; }
+  .animated-guide-pip { top: 54px; right: 10px; width: 39%; min-width: 130px; border-radius: 14px; }
+  .animated-guide-title { padding: 7px 8px; }
+  .animated-guide-title b { font-size: 11px; }
   .mirror-option { grid-template-columns: 1fr; }
   .zone-badge b { width: 19px; height: 19px; font-size: 9px; }
   .zone-badge small { font-size: 7px; padding: 3px 6px; }

@@ -1,6 +1,6 @@
 # Makeup Bestie
 
-A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. It turns an accessible public tutorial link or permitted video upload into personalized, feature-by-feature placement lessons using a single face scan. Lessons are camera-free by default and can optionally open a silent local mirror.
+A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. It turns an accessible public tutorial link or permitted video upload into personalized, feature-by-feature placement lessons using a single face scan. Choosing a feature opens a silent local mirror with a small animated placement preview.
 
 ## Launch flow
 
@@ -9,18 +9,18 @@ A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face 
 3. Paste an accessible public tutorial link **or** attach a permitted video copy, optionally add preferences, and select products already owned.
 4. Review the personalized plan and explicitly consent before sending one photo for an AI makeup preview.
 5. Choose an available facial area such as eyes, cheeks, lips, brows, nose, complexion, or jaw.
-6. Follow only the analyzed tutorial steps affecting that feature, with placement zones, animated application arrows, personalized instructions, timestamped clips, and an optional silent live mirror.
+6. Follow only the analyzed tutorial steps affecting that feature in the silent live mirror, with on-device placement tracking and a small animated guide showing application direction.
 
 ## Privacy
 
-- The Glam Room never opens a microphone or camera automatically.
+- The Glam Room never opens a microphone. The camera starts only after the user explicitly chooses a facial area, and it can be stopped immediately.
 - Facial landmarks are computed on-device from the selected face-scan photo and anchor the placement overlays.
 - Face shape is a fallible, editable estimate.
 - Uploaded tutorial videos are sampled in the browser. Ordered still frames are used for one lesson-creation request and are not saved by the app.
 - Pasted tutorial links are resolved only when they expose public video media. The resolver blocks private-network destinations, limits redirects and page size, does not use platform credentials, and requests an upload when the platform blocks video access.
 - The face-scan photo stays local until the user separately opts into preview generation. Makeup Bestie does not save the generated-preview request or result.
 - The selected upload or publicly resolved stream remains available only in the current browser session so the Glam Room can replay relevant timestamped segments.
-- The optional feature mirror uses local MediaPipe tracking. Camera frames are not uploaded, analyzed by OpenAI, recorded, or saved; closing the mirror or leaving the lesson stops every media track.
+- The feature mirror uses local MediaPipe tracking. Camera frames are not uploaded, analyzed by OpenAI, recorded, or saved; stopping the mirror, choosing another feature, or leaving the lesson stops every media track.
 
 Review OpenAI API data controls and configure account retention before production launch.
 
