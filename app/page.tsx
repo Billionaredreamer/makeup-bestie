@@ -61,7 +61,7 @@ function FaceFeaturePicker({ photo }: { photo:string }) {
 
 type MirrorStatus="starting"|"active"|"no-face"|"poor-light"|"denied"|"error";
 type VideoLandmarker={detectForVideo:(video:HTMLVideoElement,time:number)=>{faceLandmarks:Point[][]};close:()=>void};
-function SilentMirror({ areas, technique, shape, stepNumber, paused, onClose }: { areas:LessonRegion[]; technique:Technique; shape:FaceShape|null; stepNumber:number; paused:boolean; onClose:()=>void }) {
+function SilentMirror({ areas, technique, shape, stepNumber, paused, facingMode }: { areas:LessonRegion[]; technique:Technique; shape:FaceShape|null; stepNumber:number; paused:boolean; facingMode:"user"|"environment" }) {
   const camera=useRef<HTMLVideoElement>(null);
   const [status,setStatus]=useState<MirrorStatus>("starting");
   const [livePoints,setLivePoints]=useState<Point[]>([]);
@@ -79,7 +79,7 @@ function SilentMirror({ areas, technique, shape, stepNumber, paused, onClose }: 
     const start=async()=>{
       setStatus("starting");setLivePoints([]);
       try {
-        media=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:720},height:{ideal:720}},audio:false});
+        media=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facingMode},width:{ideal:720},height:{ideal:720}},audio:false});
         if(disposed){media.getTracks().forEach(track=>track.stop());return;}
         if(!videoElement) return;
         videoElement.srcObject=media;await videoElement.play();
@@ -111,16 +111,15 @@ function SilentMirror({ areas, technique, shape, stepNumber, paused, onClose }: 
     };
     void start();
     return()=>{disposed=true;cancelAnimationFrame(raf);landmarker?.close();media?.getTracks().forEach(track=>track.stop());if(videoElement)videoElement.srcObject=null;};
-  },[retry]);
+  },[facingMode,retry]);
   const copy:Record<MirrorStatus,string>={starting:"Starting your private mirror…",active:"Private mirror active · landmarks stay on this device","no-face":"No face detected. Center the selected feature in view.","poor-light":"Lighting is too low for stable placement. Face a soft light.",denied:"Camera permission was denied.",error:"The private mirror could not start on this device."};
-  return <div className="silent-mirror" style={{aspectRatio:String(feedAspect)}}>
-    <video ref={camera} autoPlay muted playsInline/>
+  return <div className={`silent-mirror${facingMode==="user"?" front-camera":""}`} style={{aspectRatio:String(feedAspect)}}>
+    <video ref={camera} className={facingMode==="user"?"mirrored":""} autoPlay muted playsInline/>
     {livePoints.length>0&&(
-      <PlacementGuide id="mirror" mirrored focused points={livePoints} areas={areas} technique={technique} shape={shape} aspect={feedAspect} stepNumber={stepNumber} paused={paused}/>
+      <PlacementGuide id="mirror" mirrored={facingMode==="user"} focused points={livePoints} areas={areas} technique={technique} shape={shape} aspect={feedAspect} stepNumber={stepNumber} paused={paused}/>
     )}
     <div className={`mirror-status ${status}`}><i/><span>{copy[status]}</span></div>
     {(status==="denied"||status==="error")&&<button className="mirror-retry" onClick={()=>setRetry(value=>value+1)}>Retry camera</button>}
-    <button className="mirror-close" onClick={onClose}>Stop mirror</button>
   </div>;
 }
 
@@ -137,6 +136,10 @@ export default function App() {
   const [photoAspect, setPhotoAspect] = useState(3/4);
   const [selectedFeature, setSelectedFeature] = useState<FeatureKey|null>(null);
   const [mirrorOpen,setMirrorOpen]=useState(false);
+  const [cameraFacing,setCameraFacing]=useState<"user"|"environment">("user");
+  const [guideCorner,setGuideCorner]=useState<"left"|"right">("right");
+  const [guideExpanded,setGuideExpanded]=useState(false);
+  const [lessonPanelOpen,setLessonPanelOpen]=useState(true);
   const [tutorialClipOpen,setTutorialClipOpen]=useState(false);
   // Blending arrows animate by default, but anyone can freeze them — and they
   // start frozen for people who have asked their system to reduce motion.
@@ -448,7 +451,7 @@ export default function App() {
       const target = Math.max(0,Math.min(activeLesson.length-1,nextStep));
       setStep(target);
     };
-    const chooseFeature=(feature:FeatureKey)=>{setSelectedFeature(feature);setMirrorOpen(true);setTutorialClipOpen(false);setStep(0);};
+    const chooseFeature=(feature:FeatureKey)=>{setSelectedFeature(feature);setMirrorOpen(true);setCameraFacing("user");setGuideExpanded(false);setLessonPanelOpen(true);setTutorialClipOpen(false);setStep(0);};
     const choosingFeature=!selectedFeature;
     const focusedFeature=Boolean(selectedFeature);
     const visibleAreas=(item:LessonStep)=>focusedFeature&&selectedFeature?stepAreasForFeature(item,selectedFeature):stepAreas(item);
@@ -461,7 +464,7 @@ export default function App() {
     </div>;
     return <>
       {nav}
-      <main className="glam-room page-enter">
+      <main className={`glam-room page-enter${choosingFeature?" choosing-feature":" lesson-active"}`}>
         <div className="glam-heading">
           <div><p className="eyebrow">The Glam Room · Part-by-part lesson</p><h1>{brief?.title || "Your personalized lesson"}</h1><p>{choosingFeature?"Choose one available area on your face to begin.":mirrorOpen?"Your silent live mirror is open. Follow the animated placement preview in the corner.":"Your camera is paused. The personalized placement guide is still available."}</p></div>
           <div className={`offline-pill${mirrorOpen?" active":""}`}><i/> {mirrorOpen?"Private mirror active":choosingFeature?"Camera starts after your choice":"Camera paused"}</div>
@@ -469,17 +472,25 @@ export default function App() {
         <div className="glam-grid">
           <section className="glam-face-card">
             {choosingFeature?<FaceFeaturePicker photo={prepPhoto}/>:mirrorOpen?<div className="feature-mirror-stage">
-              <SilentMirror areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} stepNumber={step+1} paused onClose={()=>setMirrorOpen(false)}/>
-              <div className="animated-guide-pip">
+              <SilentMirror areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} stepNumber={step+1} paused facingMode={cameraFacing}/>
+              <div className={`animated-guide-pip corner-${guideCorner}${guideExpanded?" expanded":""}`}>
                 <div className="animated-guide-title"><span>YOUR ANIMATED GUIDE</span><b>{currentLesson.product}</b></div>
                 {personalizedGuide(true)}
-                <button className="pip-motion-toggle" aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Ⅱ Pause arrows":"▶ Animate arrows"}</button>
+              </div>
+              <div className="mirror-toolbar" aria-label="Mirror controls">
+                <button onClick={()=>{setSelectedFeature(null);setMirrorOpen(false);setGuideExpanded(false);setStep(0);}}><span>⌁</span>Change area</button>
+                <button aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}><span>{guideMotion?"Ⅱ":"▶"}</span>{guideMotion?"Pause arrows":"Play arrows"}</button>
+                <button onClick={()=>setGuideCorner(value=>value==="right"?"left":"right")}><span>⇄</span>Move guide</button>
+                <button aria-pressed={guideExpanded} onClick={()=>setGuideExpanded(value=>!value)}><span>{guideExpanded?"↙":"↗"}</span>{guideExpanded?"Shrink guide":"Expand guide"}</button>
+                <button onClick={()=>setCameraFacing(value=>value==="user"?"environment":"user")}><span>↻</span>Flip camera</button>
+                <button className="stop-camera" onClick={()=>setMirrorOpen(false)}><span>■</span>Stop camera</button>
               </div>
             </div>:personalizedGuide()}
             {!choosingFeature&&<div className="glam-face-caption"><span>{mirrorOpen?"Silent live mirror · on-device tracking":"Camera paused · scanned-face guide"}</span><b>{areaSummary(currentLesson)}</b></div>}
           </section>
-          <aside className="glam-lesson-card">
-            {choosingFeature?<div className="feature-welcome"><p className="eyebrow">Choose your lesson area</p><h2>Pick one feature.</h2><p>Select from the list below. We’ll gather every tutorial step that affects it and keep the original product order.</p><div className="available-list">{availableFeatures.map(feature=><button key={feature} onClick={()=>chooseFeature(feature)}>{featureLabels[feature]} <span>→</span></button>)}</div></div>:<>
+          <aside className={`glam-lesson-card${lessonPanelOpen?" panel-open":" panel-closed"}`}>
+            <button className="lesson-panel-handle" aria-expanded={lessonPanelOpen} onClick={()=>setLessonPanelOpen(value=>!value)}><span/><b>{choosingFeature?"Choose a feature":`${selectedFeature?featureLabels[selectedFeature]:"Lesson"} · Step ${step+1}`}</b><small>{lessonPanelOpen?"Hide":"Show"}</small></button>
+            <div className="lesson-panel-content">{choosingFeature?<div className="feature-welcome"><p className="eyebrow">Choose your lesson area</p><h2>Pick one feature.</h2><p>Select from the list below. We’ll gather every tutorial step that affects it and keep the original product order.</p><div className="available-list">{availableFeatures.map((feature,index)=><button key={feature} onClick={()=>chooseFeature(feature)}><small>{String(index+1).padStart(2,"0")}</small><b>{featureLabels[feature]}</b><span>→</span></button>)}</div></div>:<>
               <div className="lesson-progress"><span>{selectedFeature?featureLabels[selectedFeature]:"Choose a feature"}</span><span>Step {step+1} of {activeLesson.length}</span></div>
               <div className="dots">{activeLesson.map((_,index)=><i key={index} className={index<=step?"active":""}/>)}</div>
               {selectedFeature&&<button className="change-feature" onClick={()=>{setSelectedFeature(null);setMirrorOpen(false);setStep(0);}}>← Choose another face area</button>}
@@ -497,7 +508,7 @@ export default function App() {
                 <button className="outline" disabled={step===0} onClick={()=>moveToStep(step-1)}>← Previous</button>
                 {step===activeLesson.length-1?<button className="primary" onClick={()=>{setMirrorOpen(false);go("preview");}}>Finish {selectedFeature?featureLabels[selectedFeature].toLowerCase():"feature"} ✓</button>:<button className="primary" onClick={()=>moveToStep(step+1)}>Done—next product →</button>}
               </div>
-            </>}
+            </>}</div>
           </aside>
         </div>
       </main>

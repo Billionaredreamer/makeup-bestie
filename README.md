@@ -9,7 +9,7 @@ A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face 
 3. Paste an accessible public tutorial link **or** attach a permitted video copy, optionally add preferences, and select products already owned.
 4. Review the personalized plan and explicitly consent before sending one photo for an AI makeup preview.
 5. Choose an available facial area such as eyes, cheeks, lips, brows, nose, complexion, or jaw.
-6. Follow only the analyzed tutorial steps affecting that feature in the silent live mirror, with on-device placement tracking and a small animated guide showing application direction.
+6. Follow only the analyzed tutorial steps affecting that feature in the silent live mirror, with on-device placement tracking, a movable animated guide, unified camera controls, and a collapsible mobile instruction panel.
 
 ## Privacy
 
@@ -21,6 +21,7 @@ A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face 
 - The face-scan photo stays local until the user separately opts into preview generation. Makeup Bestie does not save the generated-preview request or result.
 - The selected upload or publicly resolved stream remains available only in the current browser session so the Glam Room can replay relevant timestamped segments.
 - The feature mirror uses local MediaPipe tracking. Camera frames are not uploaded, analyzed by OpenAI, recorded, or saved; stopping the mirror, choosing another feature, or leaving the lesson stops every media track.
+- Flipping between front and rear cameras restarts the local stream and stops the previous camera tracks before the new view is used.
 
 Review OpenAI API data controls and configure account retention before production launch.
 
