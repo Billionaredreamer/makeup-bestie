@@ -55,9 +55,8 @@ function TutorialClip({ src, start, end, product }: { src:string; start:number; 
   </div>;
 }
 
-function FaceFeaturePicker({ photo, available, onSelect }: { photo:string; available:FeatureKey[]; onSelect:(feature:FeatureKey)=>void }) {
-  const positions:Record<FeatureKey,{left:string;top:string}>={complexion:{left:"50%",top:"51%"},cheeks:{left:"72%",top:"57%"},eyes:{left:"34%",top:"39%"},brows:{left:"66%",top:"31%"},nose:{left:"50%",top:"54%"},lips:{left:"50%",top:"70%"},jaw:{left:"31%",top:"77%"}};
-  return <div className="feature-picker"><img src={photo} alt="Your face with selectable lesson areas"/>{available.map(feature=><button key={feature} aria-label={`Start ${featureLabels[feature]} lesson`} style={positions[feature]} onClick={()=>onSelect(feature)}><span>{featureLabels[feature]}</span></button>)}</div>;
+function FaceFeaturePicker({ photo }: { photo:string }) {
+  return <div className="feature-picker"><img src={photo} alt="Your clean scanned face before choosing a lesson area"/></div>;
 }
 
 type MirrorStatus="starting"|"active"|"no-face"|"poor-light"|"denied"|"error";
@@ -469,7 +468,7 @@ export default function App() {
         </div>
         <div className="glam-grid">
           <section className="glam-face-card">
-            {choosingFeature?<FaceFeaturePicker photo={prepPhoto} available={availableFeatures} onSelect={chooseFeature}/>:mirrorOpen?<div className="feature-mirror-stage">
+            {choosingFeature?<FaceFeaturePicker photo={prepPhoto}/>:mirrorOpen?<div className="feature-mirror-stage">
               <SilentMirror areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} stepNumber={step+1} paused onClose={()=>setMirrorOpen(false)}/>
               <div className="animated-guide-pip">
                 <div className="animated-guide-title"><span>YOUR ANIMATED GUIDE</span><b>{currentLesson.product}</b></div>
@@ -480,7 +479,7 @@ export default function App() {
             {!choosingFeature&&<div className="glam-face-caption"><span>{mirrorOpen?"Silent live mirror · on-device tracking":"Camera paused · scanned-face guide"}</span><b>{areaSummary(currentLesson)}</b></div>}
           </section>
           <aside className="glam-lesson-card">
-            {choosingFeature?<div className="feature-welcome"><p className="eyebrow">Choose on your face</p><h2>Where do you want to begin?</h2><p>Tap an available area on your photo. We’ll gather every tutorial step that affects it and keep the original product order.</p><div className="available-list">{availableFeatures.map(feature=><button key={feature} onClick={()=>chooseFeature(feature)}>{featureLabels[feature]} <span>→</span></button>)}</div></div>:<>
+            {choosingFeature?<div className="feature-welcome"><p className="eyebrow">Choose your lesson area</p><h2>Pick one feature.</h2><p>Select from the list below. We’ll gather every tutorial step that affects it and keep the original product order.</p><div className="available-list">{availableFeatures.map(feature=><button key={feature} onClick={()=>chooseFeature(feature)}>{featureLabels[feature]} <span>→</span></button>)}</div></div>:<>
               <div className="lesson-progress"><span>{selectedFeature?featureLabels[selectedFeature]:"Choose a feature"}</span><span>Step {step+1} of {activeLesson.length}</span></div>
               <div className="dots">{activeLesson.map((_,index)=><i key={index} className={index<=step?"active":""}/>)}</div>
               {selectedFeature&&<button className="change-feature" onClick={()=>{setSelectedFeature(null);setMirrorOpen(false);setStep(0);}}>← Choose another face area</button>}
