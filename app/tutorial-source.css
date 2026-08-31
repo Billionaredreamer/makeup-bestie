@@ -561,6 +561,16 @@
 .glam-visual-pair { display: grid; background: #2f211d; }
 .glam-visual-pair.mirror-open { grid-template-columns: 1fr 1fr; gap: 2px; align-items: stretch; }
 .glam-visual-pair.mirror-open .glam-face { align-self: center; }
+.routine-mirror-stage { position: relative; overflow: hidden; background: #1f1613; }
+.routine-mirror-stage > .silent-mirror { width: 100%; }
+.routine-guide-pip { position: absolute; z-index: 6; top: 58px; right: 16px; width: clamp(150px, 31%, 230px); overflow: hidden; border: 2px solid rgba(255,250,244,.86); border-radius: 18px; background: #2f211d; box-shadow: 0 18px 45px rgba(20,12,10,.42); }
+.routine-guide-pip > div:first-child { position: relative; z-index: 5; display: grid; gap: 2px; padding: 9px 11px; background: rgba(255,250,244,.94); color: var(--brown); }
+.routine-guide-pip > div:first-child span { color: var(--rose); font-size: 7px; font-weight: 800; letter-spacing: .12em; }
+.routine-guide-pip > div:first-child b { overflow: hidden; font: 13px Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
+.routine-guide-pip .glam-face { max-height: none; }
+.routine-guide-pip .zone-badge b { width: 16px; height: 16px; font-size: 8px; }
+.routine-guide-pip .zone-badge small { display: none; }
+.stage-motion-toggle { top: auto; right: auto; bottom: 14px; left: 14px; }
 .routine-transport { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 13px 18px; background: white; border-top: 1px solid var(--line); }
 .routine-transport button { border: 0; background: none; color: var(--rose); font-size: 10px; font-weight: 800; }
 .routine-transport > div { overflow: hidden; height: 4px; border-radius: 99px; background: #eadfd7; }
@@ -585,6 +595,9 @@
 .tutorial-clip span small { color: var(--muted); font-size: 8px; }
 .tutorial-clip button { border: 0; background: none; color: var(--rose); font-size: 9px; font-weight: 700; }
 .tutorial-clip video { display: block; width: 100%; max-height: 250px; background: #1e1412; }
+.tutorial-clip-control { margin: 13px 0; }
+.tutorial-clip-control > .outline { width: 100%; }
+.tutorial-clip-control .tutorial-clip { margin-bottom: 0; }
 .finished-mini { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center; margin: 13px 0; padding: 9px; border: 1px solid var(--line); border-radius: 14px; }
 .finished-mini img { width: 64px; height: 72px; border-radius: 10px; object-fit: cover; }
 .finished-mini span { display: grid; gap: 4px; }
@@ -644,6 +657,10 @@
   .lesson-mode-picker > small { grid-column: 1; }
   .feature-picker,.feature-picker > img { min-height: 480px; }
   .glam-visual-pair.mirror-open { grid-template-columns: 1fr; }
+  .routine-guide-pip { top: 56px; right: 10px; width: 38%; min-width: 126px; border-radius: 14px; }
+  .routine-guide-pip > div:first-child { padding: 7px 8px; }
+  .routine-guide-pip > div:first-child b { font-size: 11px; }
+  .stage-motion-toggle { bottom: 10px; left: 10px; }
   .mirror-option { grid-template-columns: 1fr; }
   .zone-badge b { width: 19px; height: 19px; font-size: 9px; }
   .zone-badge small { font-size: 7px; padding: 3px 6px; }
