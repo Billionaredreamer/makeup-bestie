@@ -3,11 +3,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { estimateFaceProfile, placementFor, type FaceProfile, type FaceShape, type Point } from "@/lib/face-analysis";
+import { type LessonRegion, type Technique } from "@/lib/placement-map";
+import { PlacementGuide } from "./placement-guide";
 import { extractTutorialFrames, extractTutorialFramesFromUrl } from "@/lib/video-frames";
 
 type View = "home" | "onboarding" | "face-scan" | "studio-intake" | "look-brief" | "preview" | "session" | "import" | "profile";
-type LessonRegion = "all-face" | "complexion" | "forehead" | "both-cheeks" | "left-cheek" | "right-cheek" | "both-eyes" | "left-eye" | "right-eye" | "brows" | "nose" | "lips" | "jaw" | "none";
-type Technique = "prep"|"base"|"conceal"|"contour"|"blush"|"highlight"|"eyes"|"eyeliner"|"brow"|"lips"|"finish";
 type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; areas: LessonRegion[]; technique: Technique; referenceCue: string; adaptation: string; checkpoint: string; startTimeSeconds: number; endTimeSeconds: number; uncertain: boolean };
 type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[]; analysisScope: string; steps: LessonStep[]; sourceUrl?: string; sourceVideoAnalyzed?: boolean };
 const defaultLesson: LessonStep[] = [
@@ -29,6 +29,7 @@ const featureRegions: Record<FeatureKey,LessonRegion[]> = {
   complexion:["all-face","complexion","forehead"], cheeks:["both-cheeks","left-cheek","right-cheek"], eyes:["both-eyes","left-eye","right-eye"], brows:["brows"], nose:["nose"], lips:["lips"], jaw:["jaw"],
 };
 const stepMatchesFeature = (item:LessonStep, feature:FeatureKey) => stepAreas(item).some(area=>featureRegions[feature].includes(area));
+const stepAreasForFeature = (item:LessonStep, feature:FeatureKey) => stepAreas(item).filter(area=>featureRegions[feature].includes(area));
 
 const normalizeTutorialUrl = (value: string) => {
   try {
@@ -54,46 +55,6 @@ function TutorialClip({ src, start, end, product, playing=false }: { src:string;
   </div>;
 }
 
-type GuideSpot = { key:string; cx:number; cy:number; rx:number; ry:number; rotate?:number; side?:-1|0|1 };
-function PlacementGuide({ points, areas, technique, shape, id="current", soft=false }: { points:Point[]; areas:LessonRegion[]; technique:Technique; shape:FaceShape|null; id?:string; soft?:boolean }) {
-  const at = (index:number, fallback:Point) => points[index] || fallback;
-  const leftEdge=at(234,{x:.2,y:.49}), rightEdge=at(454,{x:.8,y:.49}), top=at(10,{x:.5,y:.12}), chin=at(152,{x:.5,y:.9});
-  const faceWidth=Math.max(.42,rightEdge.x-leftEdge.x), faceHeight=Math.max(.62,chin.y-top.y), centerX=(leftEdge.x+rightEdge.x)/2;
-  const eyeLeft={x:(at(33,{x:.31,y:.39}).x+at(133,{x:.43,y:.39}).x)/2,y:(at(33,{x:.31,y:.39}).y+at(133,{x:.43,y:.39}).y)/2};
-  const eyeRight={x:(at(362,{x:.57,y:.39}).x+at(263,{x:.69,y:.39}).x)/2,y:(at(362,{x:.57,y:.39}).y+at(263,{x:.69,y:.39}).y)/2};
-  const mouth=at(13,{x:.5,y:.69}), nose=at(1,{x:.5,y:.53});
-  const cheekY=(eyeLeft.y+mouth.y)/2+.02;
-  const spotFor = (area:LessonRegion):GuideSpot[] => {
-    const common={rx:faceWidth*.13,ry:faceHeight*.07};
-    if(area==="all-face"||area==="complexion") return [{key:"face",cx:centerX,cy:(top.y+chin.y)/2,rx:faceWidth*.47,ry:faceHeight*.47,side:0}];
-    if(area==="forehead") return [{key:"forehead",cx:centerX,cy:top.y+faceHeight*.19,rx:faceWidth*.33,ry:faceHeight*.11,side:0}];
-    if(area==="both-cheeks") return [{key:"cheek-a",cx:leftEdge.x+faceWidth*.24,cy:cheekY,...common,rotate:-16,side:-1},{key:"cheek-b",cx:rightEdge.x-faceWidth*.24,cy:cheekY,...common,rotate:16,side:1}];
-    if(area==="left-cheek") return [{key:"cheek-b",cx:rightEdge.x-faceWidth*.24,cy:cheekY,...common,rotate:16,side:1}];
-    if(area==="right-cheek") return [{key:"cheek-a",cx:leftEdge.x+faceWidth*.24,cy:cheekY,...common,rotate:-16,side:-1}];
-    if(area==="both-eyes") return [{key:"eye-a",cx:eyeLeft.x,cy:eyeLeft.y,rx:faceWidth*.12,ry:faceHeight*.045,side:-1},{key:"eye-b",cx:eyeRight.x,cy:eyeRight.y,rx:faceWidth*.12,ry:faceHeight*.045,side:1}];
-    if(area==="left-eye") return [{key:"eye-b",cx:eyeRight.x,cy:eyeRight.y,rx:faceWidth*.12,ry:faceHeight*.045,side:1}];
-    if(area==="right-eye") return [{key:"eye-a",cx:eyeLeft.x,cy:eyeLeft.y,rx:faceWidth*.12,ry:faceHeight*.045,side:-1}];
-    if(area==="brows") return [{key:"brow-a",cx:eyeLeft.x,cy:eyeLeft.y-faceHeight*.085,rx:faceWidth*.13,ry:faceHeight*.035,side:-1},{key:"brow-b",cx:eyeRight.x,cy:eyeRight.y-faceHeight*.085,rx:faceWidth*.13,ry:faceHeight*.035,side:1}];
-    if(area==="nose") return [{key:"nose",cx:nose.x,cy:nose.y+faceHeight*.05,rx:faceWidth*.07,ry:faceHeight*.17,side:0}];
-    if(area==="lips") return [{key:"lips",cx:mouth.x,cy:mouth.y+faceHeight*.025,rx:faceWidth*.15,ry:faceHeight*.055,side:0}];
-    if(area==="jaw") return [{key:"jaw-a",cx:leftEdge.x+faceWidth*.2,cy:chin.y-faceHeight*.15,rx:faceWidth*.2,ry:faceHeight*.055,rotate:28,side:-1},{key:"jaw-b",cx:rightEdge.x-faceWidth*.2,cy:chin.y-faceHeight*.15,rx:faceWidth*.2,ry:faceHeight*.055,rotate:-28,side:1}];
-    return [];
-  };
-  const effectiveAreas = areas.some(area=>area==="all-face"||area==="complexion") ? (["complexion"] as LessonRegion[]) : areas;
-  const spots=effectiveAreas.flatMap(spotFor);
-  const lift = shape==="oblong"?.01:shape==="round"?.07:.045;
-  const markerId=`guide-arrow-${id.replace(/[^a-z0-9-]/gi,"")}`;
-  return <svg className={`placement-overlay technique-${technique}${soft?" completed-placement":""}`} viewBox="0 0 1 1" preserveAspectRatio="none" role="img" aria-label="Personalized product placement and application direction">
-    <defs><marker id={markerId} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z"/></marker></defs>
-    {spots.map(spot=><g key={spot.key}>
-      <ellipse className="placement-zone" cx={spot.cx} cy={spot.cy} rx={spot.rx} ry={spot.ry} transform={`rotate(${spot.rotate||0} ${spot.cx} ${spot.cy})`}/>
-      {!soft && (
-        <path className="application-arrow" markerEnd={`url(#${markerId})`} d={spot.key==="nose"?`M ${spot.cx} ${spot.cy-spot.ry*.55} L ${spot.cx} ${spot.cy+spot.ry*.55}`:technique==="lips"||spot.key==="lips"?`M ${spot.cx-spot.rx*.58} ${spot.cy} L ${spot.cx+spot.rx*.58} ${spot.cy}`:`M ${spot.cx-(spot.side||1)*spot.rx*.25} ${spot.cy+spot.ry*.28} Q ${spot.cx} ${spot.cy} ${spot.cx+(spot.side||1)*spot.rx*.9} ${spot.cy-lift}`}/>
-      )}
-    </g>)}
-  </svg>;
-}
-
 function FaceFeaturePicker({ photo, available, onSelect }: { photo:string; available:FeatureKey[]; onSelect:(feature:FeatureKey)=>void }) {
   const positions:Record<FeatureKey,{left:string;top:string}>={complexion:{left:"50%",top:"51%"},cheeks:{left:"72%",top:"57%"},eyes:{left:"34%",top:"39%"},brows:{left:"66%",top:"31%"},nose:{left:"50%",top:"54%"},lips:{left:"50%",top:"70%"},jaw:{left:"31%",top:"77%"}};
   return <div className="feature-picker"><img src={photo} alt="Your face with selectable lesson areas"/>{available.map(feature=><button key={feature} style={positions[feature]} onClick={()=>onSelect(feature)}><span>{featureLabels[feature]}</span></button>)}<div className="picker-message"><b>Tap where you want to start</b><span>Only areas found in your analyzed tutorial are available.</span></div></div>;
@@ -101,10 +62,13 @@ function FaceFeaturePicker({ photo, available, onSelect }: { photo:string; avail
 
 type MirrorStatus="starting"|"active"|"no-face"|"poor-light"|"denied"|"error";
 type VideoLandmarker={detectForVideo:(video:HTMLVideoElement,time:number)=>{faceLandmarks:Point[][]};close:()=>void};
-function SilentMirror({ areas, technique, shape, onClose }: { areas:LessonRegion[]; technique:Technique; shape:FaceShape|null; onClose:()=>void }) {
+function SilentMirror({ areas, technique, shape, stepNumber, paused, onClose }: { areas:LessonRegion[]; technique:Technique; shape:FaceShape|null; stepNumber:number; paused:boolean; onClose:()=>void }) {
   const camera=useRef<HTMLVideoElement>(null);
   const [status,setStatus]=useState<MirrorStatus>("starting");
   const [livePoints,setLivePoints]=useState<Point[]>([]);
+  // The chart is drawn in the camera's own aspect ratio, so zones sit on the
+  // face rather than on a cropped guess at where the face might be.
+  const [feedAspect,setFeedAspect]=useState(1);
   const [retry,setRetry]=useState(0);
   useEffect(()=>{
     const videoElement=camera.current;
@@ -120,6 +84,7 @@ function SilentMirror({ areas, technique, shape, onClose }: { areas:LessonRegion
         if(disposed){media.getTracks().forEach(track=>track.stop());return;}
         if(!videoElement) return;
         videoElement.srcObject=media;await videoElement.play();
+        if(videoElement.videoWidth&&videoElement.videoHeight)setFeedAspect(videoElement.videoWidth/videoElement.videoHeight);
         const {FaceLandmarker,FilesetResolver}=await import("@mediapipe/tasks-vision");
         const vision=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
         const originalError=console.error;console.error=(...args:unknown[])=>{if(typeof args[0]==="string"&&args[0].includes("Created TensorFlow Lite XNNPACK delegate"))return;originalError(...args);};
@@ -149,9 +114,11 @@ function SilentMirror({ areas, technique, shape, onClose }: { areas:LessonRegion
     return()=>{disposed=true;cancelAnimationFrame(raf);landmarker?.close();media?.getTracks().forEach(track=>track.stop());if(videoElement)videoElement.srcObject=null;};
   },[retry]);
   const copy:Record<MirrorStatus,string>={starting:"Starting your private mirror…",active:"Private mirror active · landmarks stay on this device","no-face":"No face detected. Center the selected feature in view.","poor-light":"Lighting is too low for stable placement. Face a soft light.",denied:"Camera permission was denied.",error:"The private mirror could not start on this device."};
-  return <div className="silent-mirror">
+  return <div className="silent-mirror" style={{aspectRatio:String(feedAspect)}}>
     <video ref={camera} autoPlay muted playsInline/>
-    {livePoints.length>0&&<PlacementGuide id="mirror" points={livePoints} areas={areas} technique={technique} shape={shape}/>}
+    {livePoints.length>0&&(
+      <PlacementGuide id="mirror" mirrored focused points={livePoints} areas={areas} technique={technique} shape={shape} aspect={feedAspect} stepNumber={stepNumber} paused={paused}/>
+    )}
     <div className={`mirror-status ${status}`}><i/><span>{copy[status]}</span></div>
     {(status==="denied"||status==="error")&&<button className="mirror-retry" onClick={()=>setRetry(value=>value+1)}>Retry camera</button>}
     <button className="mirror-close" onClick={onClose}>Stop mirror</button>
@@ -173,6 +140,9 @@ export default function App() {
   const [selectedFeature, setSelectedFeature] = useState<FeatureKey|null>(null);
   const [routinePlaying,setRoutinePlaying]=useState(false);
   const [mirrorOpen,setMirrorOpen]=useState(false);
+  // Blending arrows animate by default, but anyone can freeze them — and they
+  // start frozen for people who have asked their system to reduce motion.
+  const [guideMotion,setGuideMotion]=useState(true);
   const [lookNotes, setLookNotes] = useState("");
   const [lookUrl, setLookUrl] = useState("");
   const [lookFile, setLookFile] = useState<File | null>(null);
@@ -193,13 +163,19 @@ export default function App() {
   const [previewConsent, setPreviewConsent] = useState(false);
   const [previewIntensity, setPreviewIntensity] = useState<"soft"|"reference"|"dramatic">("reference");
   const [tutorialVideoUrl, setTutorialVideoUrl] = useState("");
-  void profile;
   const fullLesson = brief?.steps?.length ? brief.steps : defaultLesson;
   const matchingLesson = selectedFeature ? fullLesson.filter(item=>stepMatchesFeature(item,selectedFeature)) : fullLesson;
   const activeLesson = lessonMode==="feature" && selectedFeature && matchingLesson.length ? matchingLesson : fullLesson;
   const currentLesson = activeLesson[Math.min(step, activeLesson.length - 1)];
 
   const go = (v: View) => { const needsSetup = (v === "session" && !brief) || (v === "studio-intake" && mapStatus !== "ready"); const next = needsSetup ? "onboarding" : v; setView(next); window.scrollTo(0, 0); };
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setGuideMotion(!query.matches);
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
   useEffect(() => () => { if (prepPhoto) URL.revokeObjectURL(prepPhoto); }, [prepPhoto]);
   useEffect(() => () => { if (tutorialVideoUrl) URL.revokeObjectURL(tutorialVideoUrl); }, [tutorialVideoUrl]);
   useEffect(()=>{
@@ -299,6 +275,13 @@ export default function App() {
             <p className="eyebrow">Your editable estimate</p>
             <h2>{shape?`${shape}-shaped proportions`:"Waiting for your scan"}</h2>
             <p>This estimate helps tailor technique. It is not a judgment or permanent face classification.</p>
+            {/* The measurement behind the guess, so a wrong estimate is obvious
+                and correctable rather than presented as a verdict. */}
+            {profile&&<div className="scan-measures">
+              <div><b>{Math.round(profile.confidence*100)}%</b><small>Estimate confidence</small></div>
+              <div><b>{profile.ratios.lengthToWidth.toFixed(2)}</b><small>Length to width</small></div>
+              <div><b>{profile.ratios.foreheadToJaw.toFixed(2)}</b><small>Forehead to jaw</small></div>
+            </div>}
             {shape&&<label className="shape-correction"><span>Correct the estimate</span><select value={shape} onChange={event=>setShape(event.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(item=><option key={item}>{item}</option>)}</select></label>}
             <div className="scan-privacy"><b>Private by default</b><span>Landmark coordinates stay in this browser. The photo is sent only later if you separately request an AI makeup preview.</span></div>
             <button className="primary wide" disabled={mapStatus!=="ready"} onClick={()=>go("studio-intake")}>Choose my tutorial →</button>
@@ -482,6 +465,8 @@ export default function App() {
     };
     const chooseFeature=(feature:FeatureKey)=>{setSelectedFeature(feature);setRoutinePlaying(false);setMirrorOpen(false);setStep(0);};
     const choosingFeature=lessonMode==="feature"&&!selectedFeature;
+    const focusedFeature=lessonMode==="feature"&&Boolean(selectedFeature);
+    const visibleAreas=(item:LessonStep)=>focusedFeature&&selectedFeature?stepAreasForFeature(item,selectedFeature):stepAreas(item);
     return <>
       {nav}
       <main className="glam-room page-enter">
@@ -494,12 +479,15 @@ export default function App() {
             {choosingFeature?<FaceFeaturePicker photo={prepPhoto} available={availableFeatures} onSelect={chooseFeature}/>:<div className={`glam-visual-pair ${mirrorOpen?"mirror-open":""}`}>
               <div className="glam-face" style={{aspectRatio:String(photoAspect)}}>
                 <img src={prepPhoto} alt="Your face with a personalized makeup placement guide"/>
-                {lessonMode==="routine"&&fullLesson.slice(0,step).map((item,index)=><PlacementGuide key={`${item.product}-${index}`} id={`complete-${index}`} soft points={facePoints} areas={stepAreas(item)} technique={item.technique} shape={shape}/>)}
-                <PlacementGuide id="lesson" points={facePoints} areas={stepAreas(currentLesson)} technique={currentLesson.technique} shape={shape}/>
-                <div className="placement-key"><span/><b>{currentLesson.product}</b><small>Color = placement · arrows = application direction</small></div>
+                {/* Finished products stay on the chart as outlines, so the routine
+                    builds into a complete face map rather than resetting each step. */}
+                {activeLesson.slice(0,step).map((item,index)=><PlacementGuide key={`${item.product}-${index}`} id={`complete-${index}`} soft focused={focusedFeature} stepNumber={index+1} points={facePoints} areas={visibleAreas(item)} technique={item.technique} shape={shape} aspect={photoAspect}/>)}
+                <PlacementGuide id="lesson" focused={focusedFeature} points={facePoints} areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} aspect={photoAspect} stepNumber={step+1} paused={!guideMotion}/>
+                <button className="guide-motion-toggle" aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Ⅱ Pause arrows":"▶ Animate arrows"}</button>
+                <div className="placement-key"><span/><b>{currentLesson.product}</b><small>Outline = where it goes · arrows = which way to blend</small></div>
               </div>
               {mirrorOpen && (
-                <SilentMirror areas={stepAreas(currentLesson)} technique={currentLesson.technique} shape={shape} onClose={()=>setMirrorOpen(false)}/>
+                <SilentMirror areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} stepNumber={step+1} paused={!guideMotion} onClose={()=>setMirrorOpen(false)}/>
               )}
             </div>}
             {!choosingFeature&&lessonMode==="routine"&&<div className="routine-transport"><button onClick={()=>{if(step===activeLesson.length-1&&!routinePlaying)setStep(0);setRoutinePlaying(value=>!value);}}>{routinePlaying?"Ⅱ Pause full routine":step===activeLesson.length-1?"↻ Replay full routine":"▶ Play full routine"}</button><div><span key={`${step}-${routinePlaying}`} className={routinePlaying?"playing":""}/></div><small>{step+1} / {activeLesson.length}</small></div>}
@@ -512,7 +500,7 @@ export default function App() {
               <div className="dots">{activeLesson.map((_,index)=><i key={index} className={index<=step?"active":""}/>)}</div>
               {selectedFeature&&<button className="change-feature" onClick={()=>{setSelectedFeature(null);setMirrorOpen(false);setStep(0);}}>← Choose another face area</button>}
               <p className="eyebrow">Now we’re using</p><h2>{currentLesson.product}</h2>
-              <div className="area-chips">{stepAreas(currentLesson).map(area=><span key={area}>{areaLabels[area]}</span>)}</div>
+              <div className="area-chips">{visibleAreas(currentLesson).map(area=><span key={area}>{areaLabels[area]}</span>)}</div>
               <p className="instruction">{currentLesson.instruction}</p>
               {tutorialVideoUrl&&<TutorialClip src={tutorialVideoUrl} start={currentLesson.startTimeSeconds} end={currentLesson.endTimeSeconds} product={currentLesson.product} playing={lessonMode==="routine"&&routinePlaying}/>}
               {!tutorialVideoUrl&&<div className="tutorial-cue"><small>FROM YOUR TUTORIAL</small><p>{currentLesson.referenceCue}</p></div>}
@@ -534,7 +522,26 @@ export default function App() {
 
   if (view === "import") return <>{nav}<main className="simple-page page-enter"><section className="import-card"><div className="import-icon">▶</div><p className="eyebrow">Tutorial-aware lessons</p><h1>Bring the tutorial. We’ll make it yours.</h1><p>Start with your skin information and private face scan, then paste a public tutorial link or upload a permitted video and tell us which products are already in your makeup bag.</p><button className="primary wide" onClick={()=>{setOnboard(0);go("onboarding");}}>Start my personalized lesson →</button></section></main></>;
 
-  if (view === "profile") return <>{nav}<main className="profile page-enter"><section className="profile-top"><div className="avatar large">S</div><div><p className="eyebrow">Your beauty shelf</p><h1>Good to see you.</h1><p>{answers.skin||"Your"} skin · {answers.goal||"Personalized makeup"} · face estimate {shape||"not set"}</p></div></section><div className="stat-row"><div><b>2</b><span>Saved looks</span></div><div><b>Local</b><span>Face mapping</span></div><div><b>0</b><span>Saved face images</span></div></div></main></>;
+  if (view === "profile") {
+    // Every number here is read from this session's real state. Nothing is
+    // persisted yet, so the page says so rather than showing an invented total.
+    const savedLooks = brief && saveSessionPhotos ? 1 : 0;
+    const savedFaceImages = prepPhoto && saveSessionPhotos ? 1 : 0;
+    return <>{nav}<main className="profile page-enter">
+      <section className="profile-top">
+        <div className="avatar large">{(answers.goal || "You").trim().charAt(0).toUpperCase()}</div>
+        <div><p className="eyebrow">Your beauty shelf</p><h1>Good to see you.</h1><p>{answers.skin||"Your"} skin · {answers.goal||"Personalized makeup"} · face estimate {shape||"not set"}</p></div>
+      </section>
+      <div className="stat-row">
+        <div><b>{savedLooks}</b><span>Saved looks</span></div>
+        <div><b>{mapStatus==="ready"?"Local":"Not yet"}</b><span>Face mapping</span></div>
+        <div><b>{savedFaceImages}</b><span>Saved face images</span></div>
+      </div>
+      <p className="profile-note">{brief
+        ? `This session's lesson — ${brief.title} — lives in this browser only. Saved looks are not yet stored between visits.`
+        : "Create a lesson and it will appear here for the rest of this session. Nothing is stored between visits."}</p>
+    </main></>;
+  }
 
   return <>{nav}<main className="home page-enter"><section className="hero"><div className="hero-copy"><p className="eyebrow">Your makeup artist. Your hype woman.</p><h1>Makeup finally<br/>feels like <em>you.</em></h1><p className="hero-text">A real tutorial analysis, adapted to your features and turned into a start-to-finish placement lesson on your own face.</p><div className="hero-actions"><button className="primary" onClick={()=>go("onboarding")}>Create my lesson →</button></div></div><div className="hero-visual"><div className="arch"><div className="portrait"><div className="hair"/><div className="head"><i className="eye one"/><i className="eye two"/><i className="mouth"/></div><div className="neck"/></div><div className="call-copy"><span>YOUR PERSONALIZED GLAM ROOM</span><b>Your tutorial. Your products. Placements mapped to your face.</b></div></div><div className="floating-note"><div className="avatar small">M</div><p><b>Your privacy comes first</b><br/>Landmarks stay on your device ✦</p></div></div></section><section className="logo-strip"><span>PERSONALIZED FOR</span><b>your face</b><i>✦</i><b>your products</b><i>✦</i><b>your pace</b></section><section className="how"><div className="section-heading"><div><p className="eyebrow">Real intelligence, honest controls</p><h2>From saved tutorial<br/>to your own routine.</h2></div><p>Face shape is estimated from visible proportions and stays editable. The actual tutorial video must be analyzed before a lesson is created.</p></div><div className="feature-grid"><article><span>01</span><div className="feature-icon">♡</div><h3>Map proportions locally</h3><p>MediaPipe estimates cheeks, jaw, forehead, eyes, brows, nose, and lips in your browser.</p></article><article><span>02</span><div className="feature-icon">▶</div><h3>Analyze the tutorial</h3><p>Ordered frames reveal the real product sequence instead of generating a generic routine.</p></article><article><span>03</span><div className="feature-icon">✦</div><h3>Play your full routine</h3><p>Watch the complete look progress on your mapped face, or switch to one feature at a time.</p></article></div></section><section className="import-banner"><div><p className="eyebrow">Saw a look you love?</p><h2>Bring the tutorial.<br/>Make it <em>yours.</em></h2><p>Paste an accessible public link or upload the video, then follow the adapted routine product by product.</p><button className="cream-button" onClick={()=>go("import")}>Create my lesson →</button></div></section></main><footer><Logo home={()=>go("home")}/><p>Beauty guidance built around the person in the mirror.</p><span>© 2026 Makeup Bestie</span></footer></>;
 }

@@ -496,20 +496,62 @@
 .glam-face-card { overflow: hidden; border: 1px solid var(--line); border-radius: 28px; background: #2f211d; box-shadow: 0 24px 65px rgba(56,35,29,.13); }
 .glam-face { position: relative; width: 100%; max-height: 760px; margin: auto; background: #2f211d; }
 .glam-face > img { display: block; width: 100%; height: 100%; object-fit: fill; }
-.placement-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; color: #d77e80; }
-.placement-overlay .placement-zone { fill: currentColor; fill-opacity: .3; stroke: rgba(255,255,255,.95); stroke-width: .004; stroke-dasharray: .014 .009; filter: drop-shadow(0 0 9px currentColor); animation: placement-breathe 2.2s ease-in-out infinite; }
-.placement-overlay .application-arrow { fill: none; stroke: white; stroke-width: .008; stroke-linecap: round; stroke-dasharray: .035 .018; animation: arrow-travel 1.25s linear infinite; }
-.placement-overlay.completed-placement .placement-zone { fill-opacity: .1; stroke-opacity: .28; stroke-dasharray: none; filter: none; animation: none; }
-.placement-overlay marker path { fill: white; }
-.placement-overlay.technique-contour { color: #7e4939; }
-.placement-overlay.technique-blush { color: #e68691; }
-.placement-overlay.technique-highlight { color: #e8c276; }
-.placement-overlay.technique-eyes,.placement-overlay.technique-eyeliner { color: #8f688c; }
-.placement-overlay.technique-brow { color: #704d42; }
-.placement-overlay.technique-lips { color: #ad4d58; }
-.placement-overlay.technique-base,.placement-overlay.technique-conceal,.placement-overlay.technique-prep { color: #e0ad91; }
-@keyframes placement-breathe { 50% { fill-opacity: .43; } }
-@keyframes arrow-travel { to { stroke-dashoffset: -.106; } }
+/* --- The face chart: one ink colour per product family, shared by the outline
+   drawn on the photo and the numbered badge that labels it. --- */
+.technique-prep,.technique-base,.technique-finish { --zone: #d59468; }
+.technique-conceal { --zone: #e0a06f; }
+.technique-contour { --zone: #8a5340; }
+.technique-blush { --zone: #e0697a; }
+.technique-highlight { --zone: #d3a03c; }
+.technique-eyes,.technique-eyeliner { --zone: #8f688c; }
+.technique-brow { --zone: #6c4a3f; }
+.technique-lips { --zone: #b04c58; }
+
+.placement-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; color: var(--zone, #d77e80); }
+/* Dashed outline, lightly filled: a makeup artist's chart drawn over the photo.
+   Strokes do not scale with the SVG, so they stay crisp at any photo size. */
+.placement-overlay .placement-zone {
+  fill: currentColor; fill-opacity: .17;
+  stroke: currentColor; stroke-width: 2.1; stroke-dasharray: 7 5; stroke-linejoin: round;
+  filter: drop-shadow(0 0 2px rgba(255,250,244,.7)) drop-shadow(0 1px 3px rgba(38,22,18,.45));
+  animation: placement-breathe 2.6s ease-in-out infinite;
+}
+.placement-overlay .application-arrow {
+  fill: none; stroke: #fffaf4; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 11 7;
+  filter: drop-shadow(0 1px 3px rgba(38,22,18,.65));
+  animation: arrow-travel 1.15s linear infinite;
+}
+.placement-overlay marker path { fill: #fffaf4; }
+/* Finished products stay as quiet outlines so the routine builds up visibly. */
+.placement-overlay.completed-placement .placement-zone { fill-opacity: .07; stroke-opacity: .4; stroke-width: 1.4; stroke-dasharray: none; filter: none; animation: none; }
+.placement-overlay.motion-paused .placement-zone,.placement-overlay.motion-paused .application-arrow { animation: none; }
+@keyframes placement-breathe { 50% { fill-opacity: .27; } }
+@keyframes arrow-travel { to { stroke-dashoffset: -18; } }
+
+/* Numbered badges live in HTML rather than the SVG, so type stays round and
+   legible however the photo is proportioned. */
+.placement-labels { position: absolute; inset: 0; pointer-events: none; }
+.zone-badge { position: absolute; transform: translate(-50%,-50%); color: var(--zone, #d77e80); }
+/* The disc is filled with the zone ink, not currentColor: the number itself is
+   cream, and currentColor would paint the disc cream too. */
+.zone-badge b { display: grid; place-items: center; width: 22px; height: 22px; border: 1.5px solid rgba(255,250,244,.9); border-radius: 50%; background: var(--zone, #d77e80); color: #fffaf4; font: 700 10px/1 Georgia, serif; box-shadow: 0 3px 10px rgba(38,22,18,.45); }
+.zone-badge small { position: absolute; top: 50%; padding: 4px 8px; border-radius: 99px; background: rgba(43,27,23,.82); color: #fffaf4; font-size: 8px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; backdrop-filter: blur(6px); }
+.zone-badge.side-left small { right: calc(100% + 7px); transform: translateY(-50%); }
+.zone-badge.side-right small { left: calc(100% + 7px); transform: translateY(-50%); }
+.zone-badge.side-center small { top: calc(100% + 7px); left: 50%; transform: translateX(-50%); }
+.completed-labels .zone-badge b { width: 16px; height: 16px; border-color: rgba(255,250,244,.45); background: rgba(43,27,23,.55); font-size: 9px; box-shadow: none; }
+
+.scan-measures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
+.scan-measures div { display: grid; gap: 3px; padding: 11px 9px; border: 1px solid var(--line); border-radius: 13px; background: var(--cream); text-align: center; }
+.scan-measures b { font: 19px Georgia, serif; }
+.scan-measures small { color: var(--muted); font-size: 8px; letter-spacing: .05em; }
+.profile-note { max-width: 640px; margin: -50px 0 60px; color: var(--muted); font: 13px/1.7 Georgia, serif; }
+
+.guide-motion-toggle { position: absolute; z-index: 4; top: 14px; right: 14px; border: 1px solid rgba(255,255,255,.5); border-radius: 99px; padding: 8px 12px; background: rgba(43,27,23,.72); color: #fffaf4; font-size: 9px; font-weight: 700; backdrop-filter: blur(8px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .placement-overlay .placement-zone,.placement-overlay .application-arrow { animation: none; }
+}
 .placement-key { position: absolute; left: 18px; bottom: 18px; display: grid; grid-template-columns: 10px auto; gap: 2px 8px; max-width: calc(100% - 36px); padding: 11px 14px; border: 1px solid rgba(255,255,255,.35); border-radius: 14px; background: rgba(43,27,23,.76); color: white; backdrop-filter: blur(10px); }
 .placement-key > span { grid-row: 1 / 3; align-self: center; width: 10px; height: 10px; border-radius: 50%; background: #e68691; box-shadow: 0 0 0 5px rgba(230,134,145,.2); }
 .placement-key b { font: 15px Georgia, serif; }
@@ -572,8 +614,10 @@
 .available-list { display: grid; gap: 7px; margin-top: 20px; }
 .available-list button { display: flex; justify-content: space-between; padding: 13px 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--cream); color: var(--brown); text-align: left; }
 .available-list button span { color: var(--rose); }
-.silent-mirror { position: relative; min-height: 420px; overflow: hidden; background: #1f1613; }
-.silent-mirror > video { display: block; width: 100%; height: 100%; min-height: 420px; object-fit: cover; transform: scaleX(-1); }
+/* The mirror is sized to the camera's own aspect ratio, so nothing is cropped
+   and the chart lands on the face instead of on a guess at where it is. */
+.silent-mirror { position: relative; align-self: center; width: 100%; overflow: hidden; background: #1f1613; }
+.silent-mirror > video { display: block; width: 100%; height: 100%; object-fit: fill; transform: scaleX(-1); }
 .silent-mirror > .placement-overlay { transform: scaleX(-1); }
 .mirror-status { position: absolute; z-index: 4; top: 12px; left: 12px; right: 12px; display: flex; align-items: center; gap: 7px; padding: 9px 11px; border-radius: 12px; background: rgba(43,27,23,.78); color: white; font-size: 8px; backdrop-filter: blur(8px); }
 .mirror-status i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: #dca74e; }
@@ -600,6 +644,8 @@
   .lesson-mode-picker > small { grid-column: 1; }
   .feature-picker,.feature-picker > img { min-height: 480px; }
   .glam-visual-pair.mirror-open { grid-template-columns: 1fr; }
-  .silent-mirror,.silent-mirror > video { min-height: 420px; }
   .mirror-option { grid-template-columns: 1fr; }
+  .zone-badge b { width: 19px; height: 19px; font-size: 9px; }
+  .zone-badge small { font-size: 7px; padding: 3px 6px; }
+  .guide-motion-toggle { top: 10px; right: 10px; padding: 7px 10px; font-size: 8px; }
 }

@@ -52,6 +52,8 @@ Never put the key in source, browser code, GitHub, issues, screenshots, logs, or
 ## Architecture and limits
 
 - `lib/face-analysis.ts`: local proportion estimate and face-specific technique adaptations.
+- `lib/placement-map.ts`: turns MediaPipe landmarks into the face chart — the outline of where each product goes and the direction it is blended. Pure geometry with no React or DOM, so it is unit tested directly.
+- `app/placement-guide.tsx`: renders one lesson step of that chart over the scan — dashed outlines, animated direction arrows, numbered badges.
 - `app/api/preview-look`: identity-preserving makeup preview edits.
 - `app/api/import-look`: ordered tutorial-frame-to-structured-lesson analysis with uncertainty labels and conservative clip timestamps.
 - `app/api/tutorial-media`: bounded public-video discovery and same-origin streaming with redirect and private-network protections.
@@ -61,4 +63,12 @@ Raw video is not sent to a general-purpose model. The browser samples the visual
 
 The browser accepts either a link or an upload. For link-only input, the server checks direct video responses and public HTML video metadata, then streams accessible media so the browser can sample it. Many TikTok, Instagram, YouTube, private, login-gated, DRM-protected, and dynamically assembled videos will not expose usable media. Those cases return an honest upload request and never generate a generic lesson.
 
-Lesson creation returns a concise six-to-fourteen-step structured routine in the tutorial’s observed product order. A step may cover several areas—for example, concealer can include the under-eyes, nose, and mouth area—while remaining one product checkpoint. The generated preview remains unmarked. The Glam Room uses the locally mapped scan to draw product placement zones and application arrows. Completed products remain as a subtle visual buildup while the default routine advances automatically; part-by-part mode filters the same analyzed sequence to a selected facial area.
+Lesson creation returns a concise six-to-fourteen-step structured routine in the tutorial’s observed product order. A step may cover several areas—for example, concealer can include the under-eyes, nose, and mouth area—while remaining one product checkpoint. The generated preview remains unmarked. Completed products remain as a subtle visual buildup while the default routine advances automatically; part-by-part mode filters the same analyzed sequence to a selected facial area.
+
+## The face chart
+
+The Glam Room's central output is a placement chart drawn over the user's own scan. Each zone is built from the landmarks it belongs to rather than from a generic template, and its shape depends on the technique, not just the area: concealer under an eye is the corner-to-corner triangle, contour on a cheek is the hollow sweeping back from the top of the ear, blush on the same cheek is the apple angled toward the temple, and highlighter is the sliver of cheekbone above the contour. Arrows show the direction the product is worked in — contour blends back toward the ear, lip colour is drawn from each corner inward, base is pressed at the centre and moved outward.
+
+The face-shape estimate changes the geometry, not only the wording: a round face gets a steeper blush lift and a more diagonal contour, a long face gets horizontal blush and hairline shading added to shorten it, and a diamond face gets minimal cheek contour. The estimate stays editable, and correcting it redraws the chart.
+
+Geometry is computed in a display space scaled by the photo's aspect ratio, so nothing is stretched by a portrait or landscape scan, and strokes do not scale with the SVG so outlines stay crisp at any size. Arrows animate by default, can be paused from the chart, and start paused for anyone whose system asks for reduced motion. If a scan is unusable, a generic fallback face is charted and flagged rather than pretending the map is personal.
