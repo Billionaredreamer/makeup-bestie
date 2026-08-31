@@ -471,20 +471,11 @@
   .live-target img { height: 92px; }
 }
 
-/* Personalized, camera-free Glam Room */
-.lesson-mode-picker {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 18px 0;
-}
-
-.lesson-mode-picker > small { grid-column: 1 / -1; color: var(--rose); font-size: 8px; letter-spacing: .13em; }
-.lesson-mode-picker button { display: grid; gap: 5px; padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: white; color: var(--brown); text-align: left; }
-.lesson-mode-picker button.selected { border-color: var(--rose); background: #fff2ec; box-shadow: inset 0 0 0 1px var(--rose); }
-.lesson-mode-picker button b { font: 16px Georgia, serif; }
-.lesson-mode-picker button b small { margin-left: 5px; color: var(--rose); font: 7px Arial, sans-serif; letter-spacing: .11em; }
-.lesson-mode-picker button span { color: var(--muted); font-size: 9px; line-height: 1.4; }
+/* Personalized, feature-by-feature Glam Room */
+.part-by-part-ready { display: grid; gap: 5px; margin: 18px 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--cream); }
+.part-by-part-ready small { color: var(--rose); font-size: 8px; letter-spacing: .12em; }
+.part-by-part-ready b { font: 17px Georgia, serif; }
+.part-by-part-ready span { color: var(--muted); font-size: 9px; line-height: 1.45; }
 
 .glam-room { max-width: 1240px; margin: auto; padding: 62px 28px 90px; }
 .glam-heading { display: flex; justify-content: space-between; align-items: end; gap: 30px; margin-bottom: 26px; }
@@ -561,29 +552,8 @@
 .glam-visual-pair { display: grid; background: #2f211d; }
 .glam-visual-pair.mirror-open { grid-template-columns: 1fr 1fr; gap: 2px; align-items: stretch; }
 .glam-visual-pair.mirror-open .glam-face { align-self: center; }
-.routine-mirror-stage { position: relative; overflow: hidden; background: #1f1613; }
-.routine-mirror-stage > .silent-mirror { width: 100%; }
-.routine-guide-pip { position: absolute; z-index: 6; top: 58px; right: 16px; width: clamp(150px, 31%, 230px); overflow: hidden; border: 2px solid rgba(255,250,244,.86); border-radius: 18px; background: #2f211d; box-shadow: 0 18px 45px rgba(20,12,10,.42); }
-.routine-guide-pip > div:first-child { position: relative; z-index: 5; display: grid; gap: 2px; padding: 9px 11px; background: rgba(255,250,244,.94); color: var(--brown); }
-.routine-guide-pip > div:first-child span { color: var(--rose); font-size: 7px; font-weight: 800; letter-spacing: .12em; }
-.routine-guide-pip > div:first-child b { overflow: hidden; font: 13px Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
-.routine-guide-pip .glam-face { max-height: none; }
-.routine-guide-pip .zone-badge b { width: 16px; height: 16px; font-size: 8px; }
-.routine-guide-pip .zone-badge small { display: none; }
-.stage-motion-toggle { top: auto; right: auto; bottom: 14px; left: 14px; }
-.routine-transport { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 13px 18px; background: white; border-top: 1px solid var(--line); }
-.routine-transport button { border: 0; background: none; color: var(--rose); font-size: 10px; font-weight: 800; }
-.routine-transport > div { overflow: hidden; height: 4px; border-radius: 99px; background: #eadfd7; }
-.routine-transport > div span { display: block; width: 0; height: 100%; background: var(--rose); }
-.routine-transport > div span.playing { animation: routine-progress 6s linear forwards; }
-.routine-transport small { color: var(--muted); font-size: 8px; }
-@keyframes routine-progress { to { width: 100%; } }
-
 .glam-lesson-card { padding: 25px; border: 1px solid var(--line); border-radius: 28px; background: white; }
 .glam-lesson-card h2 { margin: 0 0 12px; font: 36px/1.05 Georgia, serif; }
-.glam-mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 24px; padding: 5px; border-radius: 99px; background: var(--cream); }
-.glam-mode-toggle button { border: 0; border-radius: 99px; padding: 10px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 700; }
-.glam-mode-toggle button.selected { background: white; color: var(--rose); box-shadow: 0 4px 14px rgba(56,35,29,.08); }
 .change-feature { margin: -30px 0 20px; border: 0; background: none; color: var(--rose); padding: 0; font-size: 9px; font-weight: 700; }
 .personalized-direction { margin: 13px 0; padding: 14px; border-radius: 14px; background: #fff0ea; }
 .personalized-direction small { color: var(--rose); font-size: 8px; letter-spacing: .13em; }
@@ -653,14 +623,8 @@
   .glam-lesson-card { padding: 20px 16px; }
   .glam-lesson-card h2 { font-size: 31px; }
   .glam-actions { grid-template-columns: 1fr; }
-  .lesson-mode-picker { grid-template-columns: 1fr; }
-  .lesson-mode-picker > small { grid-column: 1; }
   .feature-picker,.feature-picker > img { min-height: 480px; }
   .glam-visual-pair.mirror-open { grid-template-columns: 1fr; }
-  .routine-guide-pip { top: 56px; right: 10px; width: 38%; min-width: 126px; border-radius: 14px; }
-  .routine-guide-pip > div:first-child { padding: 7px 8px; }
-  .routine-guide-pip > div:first-child b { font-size: 11px; }
-  .stage-motion-toggle { bottom: 10px; left: 10px; }
   .mirror-option { grid-template-columns: 1fr; }
   .zone-badge b { width: 19px; height: 19px; font-size: 9px; }
   .zone-badge small { font-size: 7px; padding: 3px 6px; }

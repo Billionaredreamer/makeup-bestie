@@ -1,6 +1,6 @@
 # Makeup Bestie
 
-A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. It turns an accessible public tutorial link or permitted video upload into a personalized placement lesson using a single face scan. The default lesson is camera-free; part-by-part lessons can optionally open a silent local mirror.
+A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. It turns an accessible public tutorial link or permitted video upload into personalized, feature-by-feature placement lessons using a single face scan. Lessons are camera-free by default and can optionally open a silent local mirror.
 
 ## Launch flow
 
@@ -8,19 +8,19 @@ A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face 
 2. Take one bare-face photo for a private, on-device proportion scan and correct the estimate if needed.
 3. Paste an accessible public tutorial link **or** attach a permitted video copy, optionally add preferences, and select products already owned.
 4. Review the personalized plan and explicitly consent before sending one photo for an AI makeup preview.
-5. The default **Entire routine** mode automatically plays the complete product order across the mapped face. **Part by part** is an optional alternative where the user taps an available area.
-6. Follow placement zones, animated application arrows, personalized instructions, and timestamped tutorial clips. Part-by-part mode alone offers an optional silent live mirror beside the demonstration.
+5. Choose an available facial area such as eyes, cheeks, lips, brows, nose, complexion, or jaw.
+6. Follow only the analyzed tutorial steps affecting that feature, with placement zones, animated application arrows, personalized instructions, timestamped clips, and an optional silent live mirror.
 
 ## Privacy
 
-- The Glam Room never opens a microphone. The default full routine never opens the camera.
+- The Glam Room never opens a microphone or camera automatically.
 - Facial landmarks are computed on-device from the selected face-scan photo and anchor the placement overlays.
 - Face shape is a fallible, editable estimate.
 - Uploaded tutorial videos are sampled in the browser. Ordered still frames are used for one lesson-creation request and are not saved by the app.
 - Pasted tutorial links are resolved only when they expose public video media. The resolver blocks private-network destinations, limits redirects and page size, does not use platform credentials, and requests an upload when the platform blocks video access.
 - The face-scan photo stays local until the user separately opts into preview generation. Makeup Bestie does not save the generated-preview request or result.
 - The selected upload or publicly resolved stream remains available only in the current browser session so the Glam Room can replay relevant timestamped segments.
-- The optional part-by-part mirror uses local MediaPipe tracking. Camera frames are not uploaded, analyzed by OpenAI, recorded, or saved; closing the mirror or leaving the lesson stops every media track.
+- The optional feature mirror uses local MediaPipe tracking. Camera frames are not uploaded, analyzed by OpenAI, recorded, or saved; closing the mirror or leaving the lesson stops every media track.
 
 Review OpenAI API data controls and configure account retention before production launch.
 
@@ -63,7 +63,7 @@ Raw video is not sent to a general-purpose model. The browser samples the visual
 
 The browser accepts either a link or an upload. For link-only input, the server checks direct video responses and public HTML video metadata, then streams accessible media so the browser can sample it. Many TikTok, Instagram, YouTube, private, login-gated, DRM-protected, and dynamically assembled videos will not expose usable media. Those cases return an honest upload request and never generate a generic lesson.
 
-Lesson creation returns a concise six-to-fourteen-step structured routine in the tutorial’s observed product order. A step may cover several areas—for example, concealer can include the under-eyes, nose, and mouth area—while remaining one product checkpoint. The generated preview remains unmarked. Completed products remain as a subtle visual buildup while the default routine advances automatically; part-by-part mode filters the same analyzed sequence to a selected facial area.
+Lesson creation returns a concise six-to-fourteen-step structured routine in the tutorial’s observed product order. A step may cover several areas—for example, concealer can include the under-eyes, nose, and mouth area—while remaining one product checkpoint. The generated preview remains unmarked. In the Glam Room, the user selects a facial feature and the app filters that analyzed sequence to the relevant product steps while preserving their original order.
 
 ## The face chart
 

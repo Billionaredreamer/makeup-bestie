@@ -38,7 +38,7 @@ const normalizeTutorialUrl = (value: string) => {
   } catch { return ""; }
 };
 
-function TutorialClip({ src, start, end, product, playing=false }: { src:string; start:number; end:number; product:string; playing?:boolean }) {
+function TutorialClip({ src, start, end, product }: { src:string; start:number; end:number; product:string }) {
   const clip = useRef<HTMLVideoElement>(null);
   const safeStart = Math.max(0, start || 0);
   const safeEnd = Math.max(safeStart + 2, end || safeStart + 8);
@@ -47,11 +47,11 @@ function TutorialClip({ src, start, end, product, playing=false }: { src:string;
     const element=clip.current;
     if(!element||element.readyState<1) return;
     element.currentTime=safeStart;
-    if(playing) void element.play().catch(()=>{}); else element.pause();
-  },[playing,safeStart,src]);
+    element.pause();
+  },[safeStart,src]);
   return <div className="tutorial-clip">
     <div><span><b>FROM YOUR TUTORIAL</b><small>{Math.floor(safeStart/60)}:{String(Math.floor(safeStart%60)).padStart(2,"0")}–{Math.floor(safeEnd/60)}:{String(Math.floor(safeEnd%60)).padStart(2,"0")}</small></span><button onClick={replay}>↻ Replay clip</button></div>
-    <video ref={clip} src={src} playsInline muted controls preload="metadata" aria-label={`${product} tutorial segment`} onLoadedMetadata={()=>{if(clip.current){clip.current.currentTime=safeStart;if(playing)void clip.current.play().catch(()=>{});}}} onTimeUpdate={()=>{if(clip.current&&clip.current.currentTime>=safeEnd){clip.current.pause();clip.current.currentTime=safeStart;}}}/>
+    <video ref={clip} src={src} playsInline muted controls preload="metadata" aria-label={`${product} tutorial segment`} onLoadedMetadata={()=>{if(clip.current)clip.current.currentTime=safeStart;}} onTimeUpdate={()=>{if(clip.current&&clip.current.currentTime>=safeEnd){clip.current.pause();clip.current.currentTime=safeStart;}}}/>
   </div>;
 }
 
@@ -62,7 +62,7 @@ function FaceFeaturePicker({ photo, available, onSelect }: { photo:string; avail
 
 type MirrorStatus="starting"|"active"|"no-face"|"poor-light"|"denied"|"error";
 type VideoLandmarker={detectForVideo:(video:HTMLVideoElement,time:number)=>{faceLandmarks:Point[][]};close:()=>void};
-function SilentMirror({ areas, technique, shape, stepNumber, paused, showGuide=true, onClose }: { areas:LessonRegion[]; technique:Technique; shape:FaceShape|null; stepNumber:number; paused:boolean; showGuide?:boolean; onClose:()=>void }) {
+function SilentMirror({ areas, technique, shape, stepNumber, paused, onClose }: { areas:LessonRegion[]; technique:Technique; shape:FaceShape|null; stepNumber:number; paused:boolean; onClose:()=>void }) {
   const camera=useRef<HTMLVideoElement>(null);
   const [status,setStatus]=useState<MirrorStatus>("starting");
   const [livePoints,setLivePoints]=useState<Point[]>([]);
@@ -113,10 +113,10 @@ function SilentMirror({ areas, technique, shape, stepNumber, paused, showGuide=t
     void start();
     return()=>{disposed=true;cancelAnimationFrame(raf);landmarker?.close();media?.getTracks().forEach(track=>track.stop());if(videoElement)videoElement.srcObject=null;};
   },[retry]);
-  const copy:Record<MirrorStatus,string>={starting:"Starting your private mirror…",active:"Private mirror active · landmarks stay on this device","no-face":showGuide?"No face detected. Center the selected feature in view.":"No face detected. Center your face in the mirror.","poor-light":"Lighting is too low for stable placement. Face a soft light.",denied:"Camera permission was denied.",error:"The private mirror could not start on this device."};
+  const copy:Record<MirrorStatus,string>={starting:"Starting your private mirror…",active:"Private mirror active · landmarks stay on this device","no-face":"No face detected. Center the selected feature in view.","poor-light":"Lighting is too low for stable placement. Face a soft light.",denied:"Camera permission was denied.",error:"The private mirror could not start on this device."};
   return <div className="silent-mirror" style={{aspectRatio:String(feedAspect)}}>
     <video ref={camera} autoPlay muted playsInline/>
-    {showGuide&&livePoints.length>0&&(
+    {livePoints.length>0&&(
       <PlacementGuide id="mirror" mirrored focused points={livePoints} areas={areas} technique={technique} shape={shape} aspect={feedAspect} stepNumber={stepNumber} paused={paused}/>
     )}
     <div className={`mirror-status ${status}`}><i/><span>{copy[status]}</span></div>
@@ -136,9 +136,7 @@ export default function App() {
   const [shape, setShape] = useState<FaceShape | null>(null);
   const [facePoints, setFacePoints] = useState<Point[]>([]);
   const [photoAspect, setPhotoAspect] = useState(3/4);
-  const [lessonMode, setLessonMode] = useState<"routine"|"feature">("routine");
   const [selectedFeature, setSelectedFeature] = useState<FeatureKey|null>(null);
-  const [routinePlaying,setRoutinePlaying]=useState(false);
   const [mirrorOpen,setMirrorOpen]=useState(false);
   const [tutorialClipOpen,setTutorialClipOpen]=useState(false);
   // Blending arrows animate by default, but anyone can freeze them — and they
@@ -166,7 +164,7 @@ export default function App() {
   const [tutorialVideoUrl, setTutorialVideoUrl] = useState("");
   const fullLesson = brief?.steps?.length ? brief.steps : defaultLesson;
   const matchingLesson = selectedFeature ? fullLesson.filter(item=>stepMatchesFeature(item,selectedFeature)) : fullLesson;
-  const activeLesson = lessonMode==="feature" && selectedFeature && matchingLesson.length ? matchingLesson : fullLesson;
+  const activeLesson = selectedFeature && matchingLesson.length ? matchingLesson : fullLesson;
   const currentLesson = activeLesson[Math.min(step, activeLesson.length - 1)];
 
   const go = (v: View) => { const needsSetup = (v === "session" && !brief) || (v === "studio-intake" && mapStatus !== "ready"); const next = needsSetup ? "onboarding" : v; setView(next); window.scrollTo(0, 0); };
@@ -179,15 +177,6 @@ export default function App() {
   }, []);
   useEffect(() => () => { if (prepPhoto) URL.revokeObjectURL(prepPhoto); }, [prepPhoto]);
   useEffect(() => () => { if (tutorialVideoUrl) URL.revokeObjectURL(tutorialVideoUrl); }, [tutorialVideoUrl]);
-  useEffect(()=>{
-    if(view!=="session"||lessonMode!=="routine"||!routinePlaying)return;
-    const timer=window.setTimeout(()=>{
-      if(step>=activeLesson.length-1)setRoutinePlaying(false);
-      else setStep(value=>Math.min(value+1,activeLesson.length-1));
-    },6000);
-    return()=>window.clearTimeout(timer);
-  },[activeLesson.length,lessonMode,routinePlaying,step,view]);
-
   const nav = <header className="nav-shell"><nav className="nav"><Logo home={() => go("home")} /><div className="nav-links"><button onClick={() => go("home")}>Home</button><button onClick={() => go(brief?"preview":"onboarding")}>Studio</button><button onClick={() => go(mapStatus==="ready"?"studio-intake":"onboarding")}>Inspiration</button><button onClick={() => go("profile")}>My looks</button></div><button className="nav-cta" onClick={() => {setOnboard(0);go("onboarding");}}>Start my lesson →</button></nav></header>;
 
   const analyzePreparationPhoto = async (file: File) => {
@@ -247,7 +236,7 @@ export default function App() {
       setLessonStage("Turning the analyzed sequence into your personalized steps…");
       const guide = data as Omit<LookBrief,"time"> & { estimatedMinutes:number };
       setBrief({ ...guide, time:`${guide.estimatedMinutes} min`, sourceUrl:sourceUrl||undefined, sourceVideoAnalyzed:true });
-      setLessonMode("routine");setSelectedFeature(null);setRoutinePlaying(false);setMirrorOpen(false);setStep(0);go("look-brief");
+      setSelectedFeature(null);setMirrorOpen(false);setStep(0);go("look-brief");
     } catch (error) { setLessonError(error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError") ? "Tutorial analysis took too long. Please retry once; if it repeats, use a shorter tutorial." : error instanceof Error ? error.message : "The personalized lesson could not be created."); }
     finally { setLessonAnalyzing(false); setLessonStage(""); }
   };
@@ -421,8 +410,8 @@ export default function App() {
           </div>
           <aside className="preview-plan face-first-plan">
             <p className="eyebrow">Your face-first lesson</p>
-            <h2>One product at a time.</h2>
-            <p className="face-first-copy">Your analyzed tutorial becomes one chronological routine on your face. Each product has its own instruction, face-specific adjustment, and finish checkpoint.</p>
+            <h2>One feature at a time.</h2>
+            <p className="face-first-copy">Your analyzed tutorial stays in its original product order. In the Glam Room, choose a feature and see only the tutorial steps that affect that area.</p>
             <div className="face-first-flow"><span><b>1</b>Analyzed tutorial</span><i>→</i><span><b>2</b>Your features</span><i>→</i><span><b>3</b>Placement guide</span></div>
             <div className="product-timeline"><small>YOUR ROUTINE</small>{brief.steps.map((item,index)=><div key={`${item.title}-${index}`}><b>{String(index+1).padStart(2,"0")}</b><span><strong>{item.product}</strong><small>{areaSummary(item)}</small></span></div>)}</div>
             <div className="preview-summary">
@@ -434,16 +423,12 @@ export default function App() {
                 <li>{shape ? `${shape}-shaped proportion estimate` : "Facial mapping pending"}</li>
               </ul>
             </div>
-            <div className="lesson-mode-picker">
-              <small>HOW DO YOU WANT TO LEARN?</small>
-              <button className={lessonMode==="routine"?"selected":""} onClick={()=>{setLessonMode("routine");setSelectedFeature(null);setStep(0);}}><b>Entire routine <small>DEFAULT</small></b><span>Play the complete look on your face from start to finish.</span></button>
-              <button className={lessonMode==="feature"?"selected":""} onClick={()=>{setLessonMode("feature");setSelectedFeature(null);setStep(0);}}><b>Part by part</b><span>Tap eyes, cheeks, lips, or another available area.</span></button>
-            </div>
+            <div className="part-by-part-ready"><small>YOUR LESSON FORMAT</small><b>Part by part</b><span>Tap eyes, cheeks, lips, or another available area and follow only the relevant tutorial steps.</span></div>
             <label className="save-photo-option">
               <input type="checkbox" checked={saveSessionPhotos} onChange={e => setSaveSessionPhotos(e.target.checked)}/>
               <span><b>Save this look</b><small>Off by default. Your face photo is not added to My Looks unless you choose this.</small></span>
             </label>
-            <button className="primary wide" disabled={!prepPhoto} onClick={() => {setStep(0);setSelectedFeature(null);setMirrorOpen(false);setRoutinePlaying(lessonMode==="routine");go("session");}}>Open my Glam Room →</button>
+            <button className="primary wide" disabled={!prepPhoto} onClick={() => {setStep(0);setSelectedFeature(null);setMirrorOpen(false);go("session");}}>Choose a face area →</button>
           </aside>
         </div>
       </section>
@@ -462,60 +447,54 @@ export default function App() {
     const availableFeatures=(Object.keys(featureLabels) as FeatureKey[]).filter(feature=>fullLesson.some(item=>stepMatchesFeature(item,feature)));
     const moveToStep = (nextStep:number) => {
       const target = Math.max(0,Math.min(activeLesson.length-1,nextStep));
-      setRoutinePlaying(false);setStep(target);
+      setStep(target);
     };
-    const chooseFeature=(feature:FeatureKey)=>{setSelectedFeature(feature);setRoutinePlaying(false);setMirrorOpen(false);setStep(0);};
-    const choosingFeature=lessonMode==="feature"&&!selectedFeature;
-    const focusedFeature=lessonMode==="feature"&&Boolean(selectedFeature);
+    const chooseFeature=(feature:FeatureKey)=>{setSelectedFeature(feature);setMirrorOpen(false);setStep(0);};
+    const choosingFeature=!selectedFeature;
+    const focusedFeature=Boolean(selectedFeature);
     const visibleAreas=(item:LessonStep)=>focusedFeature&&selectedFeature?stepAreasForFeature(item,selectedFeature):stepAreas(item);
-    const personalizedGuide=(compact=false)=><div className={`glam-face${compact?" compact-guide":""}`} style={{aspectRatio:String(photoAspect)}}>
+    const personalizedGuide=<div className="glam-face" style={{aspectRatio:String(photoAspect)}}>
       <img src={prepPhoto} alt="Your face with a personalized makeup placement guide"/>
-      {activeLesson.slice(0,step).map((item,index)=><PlacementGuide key={`${item.product}-${index}`} id={`complete-${compact?"pip-":""}${index}`} soft focused={focusedFeature} stepNumber={index+1} points={facePoints} areas={visibleAreas(item)} technique={item.technique} shape={shape} aspect={photoAspect}/>)}
-      <PlacementGuide id={compact?"routine-pip":"lesson"} focused={focusedFeature} points={facePoints} areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} aspect={photoAspect} stepNumber={step+1} paused={!guideMotion}/>
-      {!compact&&<button className="guide-motion-toggle" aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Ⅱ Pause arrows":"▶ Animate arrows"}</button>}
-      {!compact&&<div className="placement-key"><span/><b>{currentLesson.product}</b><small>Outline = where it goes · arrows = which way to blend</small></div>}
+      {activeLesson.slice(0,step).map((item,index)=><PlacementGuide key={`${item.product}-${index}`} id={`complete-${index}`} soft focused stepNumber={index+1} points={facePoints} areas={visibleAreas(item)} technique={item.technique} shape={shape} aspect={photoAspect}/>)}
+      <PlacementGuide id="lesson" focused points={facePoints} areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} aspect={photoAspect} stepNumber={step+1} paused={!guideMotion}/>
+      <button className="guide-motion-toggle" aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Ⅱ Pause arrows":"▶ Animate arrows"}</button>
+      <div className="placement-key"><span/><b>{currentLesson.product}</b><small>Outline = where it goes · arrows = which way to blend</small></div>
     </div>;
     return <>
       {nav}
       <main className="glam-room page-enter">
         <div className="glam-heading">
-          <div><p className="eyebrow">The Glam Room · {lessonMode==="routine"?`Product ${step+1} of ${activeLesson.length}`:"Part-by-part lesson"}</p><h1>{brief?.title || "Your personalized lesson"}</h1><p>{lessonMode==="routine"?"Your complete routine plays across your mapped face from start to finish.":mirrorOpen?"Your optional silent mirror is using on-device landmarks only.":"Choose a feature and follow its personalized placement guide without opening a camera."}</p></div>
+          <div><p className="eyebrow">The Glam Room · Part-by-part lesson</p><h1>{brief?.title || "Your personalized lesson"}</h1><p>{mirrorOpen?"Your optional silent mirror is using on-device landmarks only.":"Choose a feature and follow its personalized placement guide without opening a camera."}</p></div>
           <div className="offline-pill"><i/> {mirrorOpen?"Private mirror active":"Camera off · placement guide active"}</div>
         </div>
         <div className="glam-grid">
           <section className="glam-face-card">
-            {choosingFeature?<FaceFeaturePicker photo={prepPhoto} available={availableFeatures} onSelect={chooseFeature}/>:mirrorOpen&&lessonMode==="routine"?<div className="routine-mirror-stage">
-              <SilentMirror showGuide={false} areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} stepNumber={step+1} paused={!guideMotion} onClose={()=>setMirrorOpen(false)}/>
-              <div className="routine-guide-pip"><div><span>PERSONALIZED GUIDE</span><b>{currentLesson.product}</b></div>{personalizedGuide(true)}</div>
-              <button className="guide-motion-toggle stage-motion-toggle" aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Ⅱ Pause arrows":"▶ Animate arrows"}</button>
-            </div>:<div className={`glam-visual-pair ${mirrorOpen?"mirror-open":""}`}>
-              {personalizedGuide()}
+            {choosingFeature?<FaceFeaturePicker photo={prepPhoto} available={availableFeatures} onSelect={chooseFeature}/>:<div className={`glam-visual-pair ${mirrorOpen?"mirror-open":""}`}>
+              {personalizedGuide}
               {mirrorOpen&&(
                 <SilentMirror areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} stepNumber={step+1} paused={!guideMotion} onClose={()=>setMirrorOpen(false)}/>
               )}
             </div>}
-            {!choosingFeature&&lessonMode==="routine"&&<div className="routine-transport"><button onClick={()=>{if(step===activeLesson.length-1&&!routinePlaying)setStep(0);setRoutinePlaying(value=>!value);}}>{routinePlaying?"Ⅱ Pause full routine":step===activeLesson.length-1?"↻ Replay full routine":"▶ Play full routine"}</button><div><span key={`${step}-${routinePlaying}`} className={routinePlaying?"playing":""}/></div><small>{step+1} / {activeLesson.length}</small></div>}
             {!choosingFeature&&<div className="glam-face-caption"><span>Mapped to your scanned face</span><b>{areaSummary(currentLesson)}</b></div>}
           </section>
           <aside className="glam-lesson-card">
-            <div className="glam-mode-toggle"><button className={lessonMode==="routine"?"selected":""} onClick={()=>{setLessonMode("routine");setSelectedFeature(null);setMirrorOpen(false);setRoutinePlaying(true);setStep(0);}}>Entire routine · default</button><button className={lessonMode==="feature"?"selected":""} onClick={()=>{setLessonMode("feature");setSelectedFeature(null);setMirrorOpen(false);setRoutinePlaying(false);setStep(0);}}>Part by part</button></div>
             {choosingFeature?<div className="feature-welcome"><p className="eyebrow">Choose on your face</p><h2>Where do you want to begin?</h2><p>Tap an available area on your photo. We’ll gather every tutorial step that affects it and keep the original product order.</p><div className="available-list">{availableFeatures.map(feature=><button key={feature} onClick={()=>chooseFeature(feature)}>{featureLabels[feature]} <span>→</span></button>)}</div></div>:<>
-              <div className="lesson-progress"><span>{selectedFeature?featureLabels[selectedFeature]:"Entire routine"}</span><span>Step {step+1} of {activeLesson.length}</span></div>
+              <div className="lesson-progress"><span>{selectedFeature?featureLabels[selectedFeature]:"Choose a feature"}</span><span>Step {step+1} of {activeLesson.length}</span></div>
               <div className="dots">{activeLesson.map((_,index)=><i key={index} className={index<=step?"active":""}/>)}</div>
               {selectedFeature&&<button className="change-feature" onClick={()=>{setSelectedFeature(null);setMirrorOpen(false);setStep(0);}}>← Choose another face area</button>}
               <p className="eyebrow">Now we’re using</p><h2>{currentLesson.product}</h2>
               <div className="area-chips">{visibleAreas(currentLesson).map(area=><span key={area}>{areaLabels[area]}</span>)}</div>
               <p className="instruction">{currentLesson.instruction}</p>
-              {tutorialVideoUrl&&<div className="tutorial-clip-control"><button className="outline" onClick={()=>setTutorialClipOpen(value=>!value)}>{tutorialClipOpen?"Hide tutorial clip":"View tutorial clip"}</button>{tutorialClipOpen&&<TutorialClip src={tutorialVideoUrl} start={currentLesson.startTimeSeconds} end={currentLesson.endTimeSeconds} product={currentLesson.product} playing={lessonMode==="routine"&&routinePlaying}/>}</div>}
+              {tutorialVideoUrl&&<div className="tutorial-clip-control"><button className="outline" onClick={()=>setTutorialClipOpen(value=>!value)}>{tutorialClipOpen?"Hide tutorial clip":"View tutorial clip"}</button>{tutorialClipOpen&&<TutorialClip src={tutorialVideoUrl} start={currentLesson.startTimeSeconds} end={currentLesson.endTimeSeconds} product={currentLesson.product}/>}</div>}
               {!tutorialVideoUrl&&<div className="tutorial-cue"><small>FROM YOUR TUTORIAL</small><p>{currentLesson.referenceCue}</p></div>}
               <div className="personalized-direction"><small>PLACEMENT FOR YOUR FACE</small><p>{currentLesson.adaptation}</p>{personalizedPlacement!==currentLesson.adaptation&&<p>{personalizedPlacement}</p>}</div>
               <div className="step-target"><small>THIS STEP IS READY WHEN</small><p>{currentLesson.checkpoint}</p></div>
               {currentLesson.uncertain&&<div className="uncertain-step"><b>Uncertain tutorial detail</b><span>This product, shade, or hidden technique could not be confirmed from the analyzed frames.</span></div>}
               {previewImage&&<div className="finished-mini"><img src={previewImage} alt="Your personalized finished look"/><span><small>YOUR FINISHED TARGET</small><b>{brief?.title}</b></span></div>}
-              <div className="mirror-option"><div><b>{lessonMode==="routine"?"Use your silent Glam Mirror":"Want a live mirror?"}</b><span>{lessonMode==="routine"?"Your camera becomes the main mirror while the animated guide stays visible in the corner.":"Optional and silent. Landmarks stay on this device; no frames are uploaded."}</span></div><button className="outline" onClick={()=>setMirrorOpen(value=>!value)}>{mirrorOpen?"Stop silent mirror":"Open silent mirror"}</button></div>
+              <div className="mirror-option"><div><b>Want a live mirror?</b><span>Optional and silent. Landmarks stay on this device; no frames are uploaded.</span></div><button className="outline" onClick={()=>setMirrorOpen(value=>!value)}>{mirrorOpen?"Stop silent mirror":"Open silent mirror"}</button></div>
               <div className="glam-actions">
                 <button className="outline" disabled={step===0} onClick={()=>moveToStep(step-1)}>← Previous</button>
-                {step===activeLesson.length-1?<button className="primary" onClick={()=>{setRoutinePlaying(false);setMirrorOpen(false);go("preview");}}>Finish {selectedFeature?featureLabels[selectedFeature].toLowerCase():"routine"} ✓</button>:<button className="primary" onClick={()=>moveToStep(step+1)}>Done—next product →</button>}
+                {step===activeLesson.length-1?<button className="primary" onClick={()=>{setMirrorOpen(false);go("preview");}}>Finish {selectedFeature?featureLabels[selectedFeature].toLowerCase():"feature"} ✓</button>:<button className="primary" onClick={()=>moveToStep(step+1)}>Done—next product →</button>}
               </div>
             </>}
           </aside>
@@ -547,5 +526,5 @@ export default function App() {
     </main></>;
   }
 
-  return <>{nav}<main className="home page-enter"><section className="hero"><div className="hero-copy"><p className="eyebrow">Your makeup artist. Your hype woman.</p><h1>Makeup finally<br/>feels like <em>you.</em></h1><p className="hero-text">A real tutorial analysis, adapted to your features and turned into a start-to-finish placement lesson on your own face.</p><div className="hero-actions"><button className="primary" onClick={()=>go("onboarding")}>Create my lesson →</button></div></div><div className="hero-visual"><div className="arch"><div className="portrait"><div className="hair"/><div className="head"><i className="eye one"/><i className="eye two"/><i className="mouth"/></div><div className="neck"/></div><div className="call-copy"><span>YOUR PERSONALIZED GLAM ROOM</span><b>Your tutorial. Your products. Placements mapped to your face.</b></div></div><div className="floating-note"><div className="avatar small">M</div><p><b>Your privacy comes first</b><br/>Landmarks stay on your device ✦</p></div></div></section><section className="logo-strip"><span>PERSONALIZED FOR</span><b>your face</b><i>✦</i><b>your products</b><i>✦</i><b>your pace</b></section><section className="how"><div className="section-heading"><div><p className="eyebrow">Real intelligence, honest controls</p><h2>From saved tutorial<br/>to your own routine.</h2></div><p>Face shape is estimated from visible proportions and stays editable. The actual tutorial video must be analyzed before a lesson is created.</p></div><div className="feature-grid"><article><span>01</span><div className="feature-icon">♡</div><h3>Map proportions locally</h3><p>MediaPipe estimates cheeks, jaw, forehead, eyes, brows, nose, and lips in your browser.</p></article><article><span>02</span><div className="feature-icon">▶</div><h3>Analyze the tutorial</h3><p>Ordered frames reveal the real product sequence instead of generating a generic routine.</p></article><article><span>03</span><div className="feature-icon">✦</div><h3>Play your full routine</h3><p>Watch the complete look progress on your mapped face, or switch to one feature at a time.</p></article></div></section><section className="import-banner"><div><p className="eyebrow">Saw a look you love?</p><h2>Bring the tutorial.<br/>Make it <em>yours.</em></h2><p>Paste an accessible public link or upload the video, then follow the adapted routine product by product.</p><button className="cream-button" onClick={()=>go("import")}>Create my lesson →</button></div></section></main><footer><Logo home={()=>go("home")}/><p>Beauty guidance built around the person in the mirror.</p><span>© 2026 Makeup Bestie</span></footer></>;
+  return <>{nav}<main className="home page-enter"><section className="hero"><div className="hero-copy"><p className="eyebrow">Your makeup artist. Your hype woman.</p><h1>Makeup finally<br/>feels like <em>you.</em></h1><p className="hero-text">A real tutorial analysis, adapted to your features and turned into focused placement lessons on your own face.</p><div className="hero-actions"><button className="primary" onClick={()=>go("onboarding")}>Create my lesson →</button></div></div><div className="hero-visual"><div className="arch"><div className="portrait"><div className="hair"/><div className="head"><i className="eye one"/><i className="eye two"/><i className="mouth"/></div><div className="neck"/></div><div className="call-copy"><span>YOUR PERSONALIZED GLAM ROOM</span><b>Your tutorial. Your products. Placements mapped to your face.</b></div></div><div className="floating-note"><div className="avatar small">M</div><p><b>Your privacy comes first</b><br/>Landmarks stay on your device ✦</p></div></div></section><section className="logo-strip"><span>PERSONALIZED FOR</span><b>your face</b><i>✦</i><b>your products</b><i>✦</i><b>your pace</b></section><section className="how"><div className="section-heading"><div><p className="eyebrow">Real intelligence, honest controls</p><h2>From saved tutorial<br/>to your own routine.</h2></div><p>Face shape is estimated from visible proportions and stays editable. The actual tutorial video must be analyzed before a lesson is created.</p></div><div className="feature-grid"><article><span>01</span><div className="feature-icon">♡</div><h3>Map proportions locally</h3><p>MediaPipe estimates cheeks, jaw, forehead, eyes, brows, nose, and lips in your browser.</p></article><article><span>02</span><div className="feature-icon">▶</div><h3>Analyze the tutorial</h3><p>Ordered frames reveal the real product sequence instead of generating a generic routine.</p></article><article><span>03</span><div className="feature-icon">✦</div><h3>Choose a face area</h3><p>Tap eyes, cheeks, lips, or another feature and follow only the tutorial steps that affect it.</p></article></div></section><section className="import-banner"><div><p className="eyebrow">Saw a look you love?</p><h2>Bring the tutorial.<br/>Make it <em>yours.</em></h2><p>Paste an accessible public link or upload the video, then follow the adapted routine product by product.</p><button className="cream-button" onClick={()=>go("import")}>Create my lesson →</button></div></section></main><footer><Logo home={()=>go("home")}/><p>Beauty guidance built around the person in the mirror.</p><span>© 2026 Makeup Bestie</span></footer></>;
 }
