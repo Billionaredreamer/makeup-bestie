@@ -1,19 +1,23 @@
 # Makeup Bestie
 
-A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. It turns an accessible public tutorial link or permitted video upload into personalized, feature-by-feature placement lessons using a single face scan. Choosing a feature opens a silent local mirror with a small animated placement preview.
+A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. It turns an accessible public tutorial link or permitted video upload into personalized, feature-by-feature placement lessons using a single face scan. The mobile-first app shell has Home, Discover, Create, My Looks, and Profile tabs; choosing a feature opens a silent local mirror with a small animated placement preview.
 
 ## Launch flow
 
-1. Complete skin, complexion, experience, and makeup-goal onboarding.
-2. Take one bare-face photo for a private, on-device proportion scan and correct the estimate if needed.
-3. Paste an accessible public tutorial link **or** attach a permitted video copy, optionally add preferences, and select products already owned.
-4. Review the personalized plan and explicitly consent before sending one photo for an AI makeup preview.
-5. Choose an available facial area such as eyes, cheeks, lips, brows, nose, complexion, or jaw.
-6. Follow only the analyzed tutorial steps affecting that feature in the silent live mirror, with on-device placement tracking, a movable animated guide, unified camera controls, and a collapsible mobile instruction panel.
+1. Create a private, on-device beauty profile with a name, email, skin type, complexion, experience level, and makeup goal. Cloud authentication is not represented as connected.
+2. Open the personalized Home screen and paste an accessible public tutorial link **or** attach a permitted video copy.
+3. Let the server-backed lesson creator analyze real tutorial frames, then confirm preferences, available products, and product order.
+4. Take one current bare-face photo for a private, on-device proportion scan and correct the estimate if needed.
+5. Review the current face beside the personalized finished-look preview, and explicitly consent before sending that single photo for preview generation.
+6. Choose an available facial area such as eyes, cheeks, lips, brows, nose, complexion, or jaw.
+7. Follow only the analyzed tutorial steps affecting that feature in the large silent live mirror, with on-device placement tracking, a movable animated picture-in-picture guide, unified camera controls, and a collapsible mobile instruction panel.
+
+The bottom navigation keeps the core product areas one tap away: Home for the personalized greeting and routine composer, Discover for the honest future Routine Coach marketplace, Create for the tutorial-first lesson flow, My Looks for current and deliberately saved lessons, and Profile for local beauty preferences.
 
 ## Privacy
 
 - The Glam Room never opens a microphone. The camera starts only after the user explicitly chooses a facial area, and it can be stopped immediately.
+- Beauty-profile answers are stored in the browser's local storage for this prototype. They are not a cloud account and do not sync across devices.
 - Facial landmarks are computed on-device from the selected face-scan photo and anchor the placement overlays.
 - Face shape is a fallible, editable estimate.
 - Uploaded tutorial videos are sampled in the browser. Ordered still frames are used for one lesson-creation request and are not saved by the app.
@@ -61,6 +65,8 @@ Never put the key in source, browser code, GitHub, issues, screenshots, logs, or
 - `lib/video-frames.ts`: browser-side, timeline-wide tutorial frame sampling with sample timestamps.
 
 Raw video is not sent to a general-purpose model. The browser samples the visual timeline, and spoken-only details are explicitly treated as uncertain. MediaPipe assets currently load from Google/jsDelivr; self-host them before enforcing a restrictive production CSP.
+
+Discover is currently an honest marketplace foundation rather than a simulated store. Creator publishing, tutorial-rights review, purchases, and account-backed ownership must be connected before real Routine Coaches appear. The live voice coach is likewise not simulated in this build; the present Glam Room uses silent local guidance.
 
 The browser accepts either a link or an upload. For link-only input, the server checks direct video responses and public HTML video metadata, then streams accessible media so the browser can sample it. Many TikTok, Instagram, YouTube, private, login-gated, DRM-protected, and dynamically assembled videos will not expose usable media. Those cases return an honest upload request and never generate a generic lesson.
 

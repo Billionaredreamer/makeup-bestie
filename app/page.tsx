@@ -7,7 +7,7 @@ import { type LessonRegion, type Technique } from "@/lib/placement-map";
 import { PlacementGuide } from "./placement-guide";
 import { extractTutorialFrames, extractTutorialFramesFromUrl } from "@/lib/video-frames";
 
-type View = "home" | "onboarding" | "face-scan" | "studio-intake" | "look-brief" | "preview" | "session" | "import" | "profile";
+type View = "home" | "discover" | "my-looks" | "onboarding" | "face-scan" | "studio-intake" | "look-brief" | "preview" | "session" | "import" | "profile";
 type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; areas: LessonRegion[]; technique: Technique; referenceCue: string; adaptation: string; checkpoint: string; startTimeSeconds: number; endTimeSeconds: number; uncertain: boolean };
 type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[]; analysisScope: string; steps: LessonStep[]; sourceUrl?: string; sourceVideoAnalyzed?: boolean };
 const defaultLesson: LessonStep[] = [
@@ -128,6 +128,8 @@ function Logo({ home }: { home: () => void }) { return <button className="logo" 
 export default function App() {
   const [view, setView] = useState<View>("onboarding");
   const [onboard, setOnboard] = useState(0);
+  const [profileName,setProfileName]=useState("");
+  const [profileEmail,setProfileEmail]=useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState<FaceProfile | null>(null);
@@ -168,8 +170,26 @@ export default function App() {
   const matchingLesson = selectedFeature ? fullLesson.filter(item=>stepMatchesFeature(item,selectedFeature)) : fullLesson;
   const activeLesson = selectedFeature && matchingLesson.length ? matchingLesson : fullLesson;
   const currentLesson = activeLesson[Math.min(step, activeLesson.length - 1)];
+  const profileComplete=Boolean(profileName&&answers.skin&&answers.tone&&answers.level&&answers.goal);
+  const firstName=profileName.trim().split(/\s+/)[0]||"Bestie";
+  const greeting=(()=>{const hour=new Date().getHours();return hour<12?"Good morning":hour<18?"Good afternoon":"Good evening";})();
+  const createFlowActive=["studio-intake","face-scan","look-brief","preview","session"].includes(view);
 
-  const go = (v: View) => { const needsSetup = (v === "session" && !brief) || (v === "studio-intake" && mapStatus !== "ready"); const next = needsSetup ? "onboarding" : v; setView(next); window.scrollTo(0, 0); };
+  const go = (v: View) => {
+    let next=v;
+    if(["home","discover","studio-intake","my-looks","profile"].includes(v)&&!profileComplete)next="onboarding";
+    if(v==="session"&&!brief)next="home";
+    if(v==="preview"&&(!brief||mapStatus!=="ready"))next=brief?"face-scan":"studio-intake";
+    setView(next);window.scrollTo(0,0);
+  };
+  useEffect(()=>{
+    try {
+      const saved=window.localStorage.getItem("makeup-bestie-profile-v1");
+      if(!saved)return;
+      const parsed=JSON.parse(saved) as {name?:string;email?:string;answers?:Record<string,string>};
+      if(parsed.name&&parsed.answers?.skin&&parsed.answers?.tone&&parsed.answers?.level&&parsed.answers?.goal)queueMicrotask(()=>{setProfileName(parsed.name||"");setProfileEmail(parsed.email||"");setAnswers(parsed.answers||{});setView("home");});
+    } catch {/* An unreadable local profile simply starts fresh. */}
+  },[]);
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
     const apply = () => setGuideMotion(!query.matches);
@@ -179,7 +199,13 @@ export default function App() {
   }, []);
   useEffect(() => () => { if (prepPhoto) URL.revokeObjectURL(prepPhoto); }, [prepPhoto]);
   useEffect(() => () => { if (tutorialVideoUrl) URL.revokeObjectURL(tutorialVideoUrl); }, [tutorialVideoUrl]);
-  const nav = <header className="nav-shell"><nav className="nav"><Logo home={() => go("home")} /><div className="nav-links"><button onClick={() => go("home")}>Home</button><button onClick={() => go(brief?"preview":"onboarding")}>Studio</button><button onClick={() => go(mapStatus==="ready"?"studio-intake":"onboarding")}>Inspiration</button><button onClick={() => go("profile")}>My looks</button></div><button className="nav-cta" onClick={() => {setOnboard(0);go("onboarding");}}>Start my lesson →</button></nav></header>;
+  const nav = <><header className="nav-shell app-nav-shell"><nav className="nav app-nav"><Logo home={() => go("home")} />{profileComplete&&view!=="onboarding"?<button className="account-chip" onClick={()=>go("profile")}><span>{firstName.charAt(0).toUpperCase()}</span><b>{firstName}</b></button>:<span className="local-profile-note">Private profile · this device</span>}</nav></header>{profileComplete&&view!=="onboarding"&&<nav className="bottom-nav" aria-label="Primary navigation">
+    <button className={view==="home"?"active":""} onClick={()=>go("home")}><i>⌂</i><span>Home</span></button>
+    <button className={view==="discover"?"active":""} onClick={()=>go("discover")}><i>◇</i><span>Discover</span></button>
+    <button className={`create-tab${createFlowActive?" active":""}`} onClick={()=>go("studio-intake")}><i>＋</i><span>Create</span></button>
+    <button className={view==="my-looks"?"active":""} onClick={()=>go("my-looks")}><i>♡</i><span>My Looks</span></button>
+    <button className={view==="profile"?"active":""} onClick={()=>go("profile")}><i>○</i><span>Profile</span></button>
+  </nav>}</>;
 
   const analyzePreparationPhoto = async (file: File) => {
     if (prepPhoto) URL.revokeObjectURL(prepPhoto);
@@ -238,7 +264,7 @@ export default function App() {
       setLessonStage("Turning the analyzed sequence into your personalized steps…");
       const guide = data as Omit<LookBrief,"time"> & { estimatedMinutes:number };
       setBrief({ ...guide, time:`${guide.estimatedMinutes} min`, sourceUrl:sourceUrl||undefined, sourceVideoAnalyzed:true });
-      setSelectedFeature(null);setMirrorOpen(false);setStep(0);go("look-brief");
+      setSelectedFeature(null);setMirrorOpen(false);setStep(0);go("face-scan");
     } catch (error) { setLessonError(error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError") ? "Tutorial analysis took too long. Please retry once; if it repeats, use a shorter tutorial." : error instanceof Error ? error.message : "The personalized lesson could not be created."); }
     finally { setLessonAnalyzing(false); setLessonStage(""); }
   };
@@ -247,9 +273,9 @@ export default function App() {
     {nav}
     <main className="simple-page page-enter">
       <section className="launch-scan-shell">
-        <button className="back" onClick={() => { setOnboard(3); go("onboarding"); }}>← Back to your information</button>
+        <button className="back" onClick={() => go("studio-intake")}>← Back to tutorial</button>
         <div className="launch-scan-heading">
-          <div><p className="eyebrow">Step 2 · Private face scan</p><h1>Let’s map your features.</h1><p>Take or choose one clear bare-face photo. MediaPipe estimates facial proportions on this device; the image is not sent anywhere during this scan.</p></div>
+          <div><p className="eyebrow">Step 3 · Today’s face</p><h1>Let’s map your features.</h1><p>Now that the tutorial is understood, take one current bare-face photo. MediaPipe estimates facial proportions on this device; the image is not sent anywhere during this scan.</p></div>
           <span className={`map-status ${mapStatus}`}>{mapStatus==="analyzing"?"Scanning…":mapStatus==="ready"?"Face map ready":mapStatus==="no-face"?"No face detected":"Photo needed"}</span>
         </div>
         <div className="launch-scan-grid">
@@ -276,7 +302,7 @@ export default function App() {
             </div>}
             {shape&&<label className="shape-correction"><span>Correct the estimate</span><select value={shape} onChange={event=>setShape(event.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(item=><option key={item}>{item}</option>)}</select></label>}
             <div className="scan-privacy"><b>Private by default</b><span>Landmark coordinates stay in this browser. The photo is sent only later if you separately request an AI makeup preview.</span></div>
-            <button className="primary wide" disabled={mapStatus!=="ready"} onClick={()=>go("studio-intake")}>Choose my tutorial →</button>
+            <button className="primary wide" disabled={mapStatus!=="ready"} onClick={()=>go("preview")}>See this look on me →</button>
           </aside>
         </div>
       </section>
@@ -287,8 +313,8 @@ export default function App() {
     {nav}
     <main className="simple-page page-enter">
       <section className="studio-intake-card">
-        <button className="back" onClick={() => go("face-scan")}>← Back to face scan</button>
-        <p className="eyebrow">Step 3 · Your inspiration</p>
+        <button className="back" onClick={() => go("home")}>← Back home</button>
+        <p className="eyebrow">Step 2 · Your inspiration</p>
         <h1>Which tutorial are we making yours?</h1>
         <p className="studio-lede">Paste a public tutorial link or upload a permitted video copy, then choose the makeup you already own.</p>
         <div className="tutorial-link-box launch-link-box">
@@ -358,7 +384,7 @@ export default function App() {
     {nav}
     <main className="simple-page page-enter">
       <section className="preview-shell">
-        <button className="back" onClick={() => go("look-brief")}>← Back to Look Brief</button>
+        <button className="back" onClick={() => go("face-scan")}>← Retake today’s photo</button>
         <div className="preview-heading">
           <div>
             <p className="eyebrow">Your personalized visualization</p>
@@ -438,8 +464,11 @@ export default function App() {
   </>;
 
   if (view === "onboarding") {
-    const qs = [["skin","First, your canvas","How does your skin usually feel?",["Dry or tight","Oily or shiny","A little of both","Balanced","Sensitive"]],["tone","Your complexion","Which range feels closest to you?",["Fair","Light","Medium","Tan","Deep","Rich"]],["level","Your experience","Where are you in your makeup journey?",["Just starting","I know the basics","Confident","Basically an artist"]],["goal","Your moment","What do you want to learn first?",["Everyday natural","Soft glam","Full glam","Editorial color","Copy a saved look"]]] as const; const q = qs[onboard];
-    return <>{nav}<main className="onboarding page-enter"><div className="progress"><span style={{width:`${(onboard+1)*25}%`}} /></div><button className="back" onClick={() => onboard ? setOnboard(onboard-1) : go("home")}>← Back</button><section className="question-card"><p className="eyebrow">{q[1]}</p><h1>{q[2]}</h1><p className="subcopy">This personalizes technique—not your beauty.</p><div className="choice-grid">{q[3].map(o => <button key={o} className={answers[q[0]]===o?"selected":""} onClick={() => setAnswers({...answers,[q[0]]:o})}>{o}<b>{answers[q[0]]===o?"✓":"○"}</b></button>)}</div><button className="primary wide" disabled={!answers[q[0]]} onClick={() => onboard===3?go("face-scan"):setOnboard(onboard+1)}>{onboard===3?"Scan my face":"Continue"} →</button></section></main></>;
+    const qs = [["skin","First, your canvas","How does your skin usually feel?",["Dry or tight","Oily or shiny","A little of both","Balanced","Sensitive"]],["tone","Your complexion","Which range feels closest to you?",["Fair","Light","Medium","Tan","Deep","Rich"]],["level","Your experience","Where are you in your makeup journey?",["Just starting","I know the basics","Confident","Basically an artist"]],["goal","Your moment","What do you want to learn first?",["Everyday natural","Soft glam","Full glam","Editorial color","Copy a saved look"]]] as const;
+    if(onboard===0)return <>{nav}<main className="onboarding account-onboarding page-enter"><div className="progress"><span style={{width:"20%"}}/></div><section className="question-card account-card"><p className="eyebrow">Welcome to Makeup Bestie</p><h1>Create your beauty profile.</h1><p className="subcopy">This prototype keeps your profile on this device. Cloud accounts and cross-device sign-in are not connected yet.</p><div className="account-fields"><label><span>Your name</span><input value={profileName} onChange={event=>setProfileName(event.target.value)} autoComplete="name" placeholder="What should your bestie call you?"/></label><label><span>Email</span><input type="email" value={profileEmail} onChange={event=>setProfileEmail(event.target.value)} autoComplete="email" placeholder="you@example.com"/></label></div><button className="primary wide" disabled={!profileName.trim()||!/^\S+@\S+\.\S+$/.test(profileEmail)} onClick={()=>setOnboard(1)}>Personalize my profile →</button></section></main></>;
+    const q=qs[onboard-1];
+    const finishProfile=()=>{const nextAnswers={...answers};window.localStorage.setItem("makeup-bestie-profile-v1",JSON.stringify({name:profileName.trim(),email:profileEmail.trim(),answers:nextAnswers}));setView("home");window.scrollTo(0,0);};
+    return <>{nav}<main className="onboarding page-enter"><div className="progress"><span style={{width:`${(onboard+1)*20}%`}} /></div><button className="back" onClick={() => setOnboard(onboard-1)}>← Back</button><section className="question-card"><p className="eyebrow">{q[1]}</p><h1>{q[2]}</h1><p className="subcopy">This personalizes technique—not your beauty.</p><div className="choice-grid">{q[3].map(o => <button key={o} className={answers[q[0]]===o?"selected":""} onClick={() => setAnswers({...answers,[q[0]]:o})}>{o}<b>{answers[q[0]]===o?"✓":"○"}</b></button>)}</div><button className="primary wide" disabled={!answers[q[0]]} onClick={() => onboard===4?finishProfile():setOnboard(onboard+1)}>{onboard===4?"Open Makeup Bestie":"Continue"} →</button></section></main></>;
   }
 
   if (view === "session") {
@@ -515,28 +544,31 @@ export default function App() {
     </>;
   }
 
-  if (view === "import") return <>{nav}<main className="simple-page page-enter"><section className="import-card"><div className="import-icon">▶</div><p className="eyebrow">Tutorial-aware lessons</p><h1>Bring the tutorial. We’ll make it yours.</h1><p>Start with your skin information and private face scan, then paste a public tutorial link or upload a permitted video and tell us which products are already in your makeup bag.</p><button className="primary wide" onClick={()=>{setOnboard(0);go("onboarding");}}>Start my personalized lesson →</button></section></main></>;
+  if (view === "import") return <>{nav}<main className="simple-page page-enter app-screen"><section className="import-card"><div className="import-icon">▶</div><p className="eyebrow">Tutorial-aware lessons</p><h1>Bring the tutorial. We’ll make it yours.</h1><p>Paste a public tutorial link or upload a permitted video. After the tutorial is analyzed, Makeup Bestie asks for today’s face photo and adapts the lesson.</p><button className="primary wide" onClick={()=>go("studio-intake")}>Create my lesson →</button></section></main></>;
+
+  if(view==="discover")return <>{nav}<main className="app-screen discover-screen page-enter"><header className="screen-heading"><div><p className="eyebrow">Discover</p><h1>Routine Coaches,<br/><em>made by creators.</em></h1></div><p>Browse creator-trained makeup routines here once publishing, rights review, and payments are connected.</p></header><div className="discover-search"><span>⌕</span><input aria-label="Search Routine Coaches" placeholder="Search looks, techniques, or skin expertise" disabled/><button disabled>Filter</button></div><section className="discover-preview"><div className="discover-orbit">✦</div><p className="eyebrow">Marketplace foundation</p><h2>No pretend listings.</h2><p>Makeup Bestie will only show Routine Coaches from creators who have uploaded, reviewed, and authorized their own tutorials. Until that system is connected, this page stays honest.</p><button className="primary" onClick={()=>go("studio-intake")}>Create from my tutorial →</button></section><section className="category-strip" aria-label="Planned discovery categories">{["Soft glam","Beginner friendly","Deep-skin expertise","Bridal","Editorial","Mature skin"].map(item=><span key={item}>{item}</span>)}</section></main></>;
+
+  if(view==="my-looks")return <>{nav}<main className="app-screen looks-screen page-enter"><header className="screen-heading"><div><p className="eyebrow">My Looks</p><h1>Your beauty shelf.</h1></div><p>Current lessons and intentionally saved looks live here. Nothing is presented as purchased until marketplace payments exist.</p></header>{brief?<article className="saved-look-card">{previewImage||prepPhoto?<img src={previewImage||prepPhoto} alt={previewImage?"Your personalized finished target":"Your current lesson face photo"}/>:<div className="saved-look-placeholder">✦</div>}<div><small>{saveSessionPhotos?"SAVED LOOK":"CURRENT SESSION · NOT SAVED"}</small><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} tutorial steps</p><div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Review look</button><button className="primary" disabled={mapStatus!=="ready"} onClick={()=>go("session")}>Continue lesson →</button></div></div></article>:<section className="looks-empty"><span>♡</span><h2>Your first look starts with a tutorial.</h2><p>Paste a link or upload a permitted video, then Makeup Bestie will turn it into a personalized lesson.</p><button className="primary" onClick={()=>go("studio-intake")}>Create my first look →</button></section>}</main></>;
 
   if (view === "profile") {
-    // Every number here is read from this session's real state. Nothing is
-    // persisted yet, so the page says so rather than showing an invented total.
+    // Every number here is read from real local state rather than invented.
     const savedLooks = brief && saveSessionPhotos ? 1 : 0;
     const savedFaceImages = prepPhoto && saveSessionPhotos ? 1 : 0;
-    return <>{nav}<main className="profile page-enter">
+    return <>{nav}<main className="profile app-screen page-enter">
       <section className="profile-top">
-        <div className="avatar large">{(answers.goal || "You").trim().charAt(0).toUpperCase()}</div>
-        <div><p className="eyebrow">Your beauty shelf</p><h1>Good to see you.</h1><p>{answers.skin||"Your"} skin · {answers.goal||"Personalized makeup"} · face estimate {shape||"not set"}</p></div>
+        <div className="avatar large">{firstName.charAt(0).toUpperCase()}</div>
+        <div><p className="eyebrow">Your on-device profile</p><h1>{profileName}</h1><p>{profileEmail} · {answers.skin||"Skin not set"} · {answers.goal||"Goal not set"}</p></div>
+        <button className="outline" onClick={()=>{setOnboard(0);setView("onboarding");window.scrollTo(0,0);}}>Edit profile</button>
       </section>
       <div className="stat-row">
         <div><b>{savedLooks}</b><span>Saved looks</span></div>
         <div><b>{mapStatus==="ready"?"Local":"Not yet"}</b><span>Face mapping</span></div>
         <div><b>{savedFaceImages}</b><span>Saved face images</span></div>
       </div>
-      <p className="profile-note">{brief
-        ? `This session's lesson — ${brief.title} — lives in this browser only. Saved looks are not yet stored between visits.`
-        : "Create a lesson and it will appear here for the rest of this session. Nothing is stored between visits."}</p>
+      <section className="profile-details"><div><small>SKIN</small><b>{answers.skin}</b></div><div><small>COMPLEXION</small><b>{answers.tone}</b></div><div><small>EXPERIENCE</small><b>{answers.level}</b></div><div><small>MAKEUP GOAL</small><b>{answers.goal}</b></div></section>
+      <p className="profile-note">Your beauty-profile answers are stored only in this browser for this prototype. Face photos and tutorial media are not added to the profile. Cloud accounts and cross-device sync still require an authentication and database phase.</p>
     </main></>;
   }
 
-  return <>{nav}<main className="home page-enter"><section className="hero"><div className="hero-copy"><p className="eyebrow">Your makeup artist. Your hype woman.</p><h1>Makeup finally<br/>feels like <em>you.</em></h1><p className="hero-text">A real tutorial analysis, adapted to your features and turned into focused placement lessons on your own face.</p><div className="hero-actions"><button className="primary" onClick={()=>go("onboarding")}>Create my lesson →</button></div></div><div className="hero-visual"><div className="arch"><div className="portrait"><div className="hair"/><div className="head"><i className="eye one"/><i className="eye two"/><i className="mouth"/></div><div className="neck"/></div><div className="call-copy"><span>YOUR PERSONALIZED GLAM ROOM</span><b>Your tutorial. Your products. Placements mapped to your face.</b></div></div><div className="floating-note"><div className="avatar small">M</div><p><b>Your privacy comes first</b><br/>Landmarks stay on your device ✦</p></div></div></section><section className="logo-strip"><span>PERSONALIZED FOR</span><b>your face</b><i>✦</i><b>your products</b><i>✦</i><b>your pace</b></section><section className="how"><div className="section-heading"><div><p className="eyebrow">Real intelligence, honest controls</p><h2>From saved tutorial<br/>to your own routine.</h2></div><p>Face shape is estimated from visible proportions and stays editable. The actual tutorial video must be analyzed before a lesson is created.</p></div><div className="feature-grid"><article><span>01</span><div className="feature-icon">♡</div><h3>Map proportions locally</h3><p>MediaPipe estimates cheeks, jaw, forehead, eyes, brows, nose, and lips in your browser.</p></article><article><span>02</span><div className="feature-icon">▶</div><h3>Analyze the tutorial</h3><p>Ordered frames reveal the real product sequence instead of generating a generic routine.</p></article><article><span>03</span><div className="feature-icon">✦</div><h3>Choose a face area</h3><p>Tap eyes, cheeks, lips, or another feature and follow only the tutorial steps that affect it.</p></article></div></section><section className="import-banner"><div><p className="eyebrow">Saw a look you love?</p><h2>Bring the tutorial.<br/>Make it <em>yours.</em></h2><p>Paste an accessible public link or upload the video, then follow the adapted routine product by product.</p><button className="cream-button" onClick={()=>go("import")}>Create my lesson →</button></div></section></main><footer><Logo home={()=>go("home")}/><p>Beauty guidance built around the person in the mirror.</p><span>© 2026 Makeup Bestie</span></footer></>;
+  return <>{nav}<main className="app-dashboard app-screen page-enter"><header className="dashboard-greeting"><p>{greeting}, {firstName}.</p><h1>What routine do you<br/>have in mind?</h1><span>Bring the tutorial first. We’ll study it before asking for today’s face photo.</span></header><section className="routine-composer"><div className="composer-heading"><span>＋</span><div><small>CREATE A PERSONALIZED LESSON</small><h2>Drop the routine here.</h2></div></div><label className="dashboard-link"><span>↗</span><input type="url" inputMode="url" value={lookUrl} onChange={event=>{setLookUrl(event.target.value);setLessonError("");}} placeholder="Paste a TikTok, Instagram, YouTube, or public video link"/></label><div className="composer-divider"><span>or</span></div><label className="dashboard-upload"><span>▶</span><div><b>{lookFile?lookFile.name:"Upload the tutorial video"}</b><small>MP4, WebM, or MOV · only content you can use</small></div><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event=>{const file=event.target.files?.[0]||null;setLookFile(file);setTutorialVideoUrl(file?URL.createObjectURL(file):"");setLessonError("");}}/></label><button className="primary composer-continue" disabled={!lookUrl.trim()&&!lookFile} onClick={()=>go("studio-intake")}>Continue with this routine →</button></section>{brief&&<section className="continue-card"><div><small>CONTINUE WHERE YOU LEFT OFF</small><h2>{brief.title}</h2><p>{mapStatus==="ready"?"Your personalized preview and feature lesson are ready.":"Tutorial analyzed · today’s face photo is next."}</p></div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Continue →</button></section>}<section className="dashboard-steps"><article><span>01</span><b>We study the tutorial</b><p>Real frames, product order, and technique.</p></article><article><span>02</span><b>You take today’s photo</b><p>Local face mapping adapts the routine.</p></article><article><span>03</span><b>You enter the Glam Room</b><p>Feature-by-feature guidance on a large live mirror.</p></article></section></main></>;
 }
