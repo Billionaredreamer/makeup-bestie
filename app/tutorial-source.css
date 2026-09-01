@@ -786,3 +786,119 @@
   .glam-room { padding-bottom: 115px; }
   .simple-page { padding-bottom: 110px; }
 }
+
+/* Creator studio: a real local recording/upload flow. Shared publishing needs
+   authenticated storage, so every local post is labeled honestly. */
+.creator-heading { max-width: 880px; margin-bottom: 25px; }
+.creator-heading > div { margin-top: 24px; }
+.creator-heading h1 { margin: 0; font: 400 clamp(48px,7vw,76px)/.96 Georgia,serif; }
+.creator-heading > div > p:last-child { max-width: 650px; color: var(--muted); font: 13px/1.6 Georgia,serif; }
+.creator-layout { display: grid; grid-template-columns: minmax(300px,430px) minmax(340px,1fr); gap: 30px; align-items: start; max-width: 1050px; }
+.creator-camera { position: sticky; top: 80px; width: 100%; aspect-ratio: 9/16; overflow: hidden; border-radius: 28px; background: radial-gradient(circle at 50% 35%,#6c4b43,#241714 72%); box-shadow: 0 28px 70px rgba(39,20,17,.24); }
+.creator-camera > video { display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.creator-camera > video[src] { transform: none; }
+.creator-camera-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; color: #fffaf4; text-align: center; }
+.creator-camera-empty span { display: grid; place-items: center; width: 65px; height: 65px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,.45); border-radius: 50%; font-size: 30px; }
+.creator-camera-empty b { font: 21px Georgia,serif; }
+.creator-camera-empty small { opacity: .65; font-size: 9px; }
+.recording-pill { position: absolute; top: 15px; left: 15px; display: flex; align-items: center; gap: 7px; padding: 8px 11px; border-radius: 99px; background: rgba(38,20,18,.75); color: white; font-size: 8px; letter-spacing: .08em; backdrop-filter: blur(10px); }
+.recording-pill i { width: 8px; height: 8px; border-radius: 50%; background: #ef6d61; animation: placement-breathe 1s infinite; }
+.creator-camera-actions { position: absolute; right: 12px; bottom: 13px; left: 12px; display: flex; justify-content: center; gap: 8px; padding: 8px; border-radius: 18px; background: rgba(36,21,18,.74); backdrop-filter: blur(14px); }
+.creator-camera-actions button,.creator-camera-actions label { display: flex; align-items: center; justify-content: center; gap: 7px; min-width: 95px; min-height: 43px; margin: 0; border: 1px solid rgba(255,255,255,.25); border-radius: 13px; padding: 8px 13px; background: rgba(255,255,255,.1); color: white; font-size: 9px; font-weight: 800; cursor: pointer; }
+.creator-camera-actions label input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.creator-camera-actions .record-button i { width: 12px; height: 12px; border-radius: 50%; background: #ff7267; }
+.creator-camera-actions .record-button.recording i { border-radius: 2px; }
+.creator-details { padding: 28px; border: 1px solid var(--line); border-radius: 26px; background: white; }
+.creator-details h2 { margin: 0 0 23px; font: 36px/1.05 Georgia,serif; }
+.creator-details > label:not(.creator-rights) { display: grid; gap: 7px; margin-bottom: 15px; }
+.creator-details > label > span,.creator-products > span { font-size: 9px; font-weight: 800; }
+.creator-details input,.creator-details textarea { width: 100%; border: 1px solid var(--line); border-radius: 14px; padding: 14px 15px; outline: 0; background: var(--cream); color: var(--brown); }
+.creator-details textarea { min-height: 110px; resize: vertical; }
+.creator-details input:focus,.creator-details textarea:focus { border-color: var(--rose); box-shadow: 0 0 0 3px rgba(168,86,68,.1); }
+.creator-products { display: grid; gap: 9px; margin: 20px 0; }
+.creator-products > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.creator-products button { border: 1px solid var(--line); border-radius: 99px; padding: 8px 10px; background: var(--cream); color: var(--muted); font-size: 8px; }
+.creator-products button.selected { border-color: var(--rose); background: #fff0ea; color: var(--rose); }
+.creator-rights { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; margin: 22px 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--cream); }
+.creator-rights input { width: auto; margin-top: 2px; }
+.creator-rights > span { display: grid; gap: 4px; }
+.creator-rights b { font-size: 9px; }
+.creator-rights small { color: var(--muted); font-size: 8px; line-height: 1.45; }
+
+/* Discover is a vertical routine feed, not a decorative marketplace grid. */
+.discover-feed { height: calc(100dvh - 64px); overflow-y: auto; background: #180f0d; scroll-snap-type: y mandatory; scrollbar-width: none; }
+.discover-feed::-webkit-scrollbar { display: none; }
+.discover-video { position: relative; width: min(100%,500px); height: calc(100dvh - 64px); min-height: 620px; margin: auto; overflow: hidden; background: #251713; scroll-snap-align: start; scroll-snap-stop: always; }
+.discover-video > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.discover-gradient { position: absolute; inset: 35% 0 0; background: linear-gradient(transparent,rgba(24,12,10,.9)); pointer-events: none; }
+.discover-post-copy { position: absolute; z-index: 3; right: 78px; bottom: 92px; left: 18px; color: white; }
+.discover-post-copy > small { font-size: 10px; font-weight: 800; }
+.discover-post-copy h2 { margin: 7px 0; font: 27px/1.05 Georgia,serif; }
+.discover-post-copy p { display: -webkit-box; overflow: hidden; margin: 0 0 10px; opacity: .82; font-size: 10px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.discover-post-copy > div { display: flex; gap: 5px; overflow: hidden; margin-bottom: 13px; }
+.discover-post-copy > div span { flex: 0 0 auto; padding: 5px 8px; border: 1px solid rgba(255,255,255,.35); border-radius: 99px; background: rgba(40,20,17,.35); font-size: 7px; backdrop-filter: blur(8px); }
+.discover-post-copy > button { border: 0; border-radius: 99px; padding: 11px 16px; background: white; color: var(--brown); font-size: 9px; font-weight: 800; }
+.discover-side-actions { position: absolute; z-index: 4; right: 12px; bottom: 116px; display: grid; gap: 13px; }
+.discover-side-actions button { display: grid; justify-items: center; gap: 3px; border: 0; background: none; color: white; }
+.discover-side-actions span { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; background: rgba(35,19,16,.5); font-size: 21px; backdrop-filter: blur(9px); }
+.discover-side-actions small { font-size: 7px; font-weight: 800; }
+.local-post-label { position: absolute; z-index: 3; top: 15px; left: 15px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.25); border-radius: 99px; background: rgba(35,18,15,.58); color: rgba(255,255,255,.82); font-size: 7px; backdrop-filter: blur(8px); }
+.empty-discover { display: grid; place-items: center; padding: 22px; }
+.discover-video.empty-card { display: grid; place-items: center; height: min(760px,calc(100dvh - 92px)); min-height: 560px; border: 1px solid rgba(255,255,255,.13); border-radius: 30px; background: radial-gradient(circle at 50% 26%,#875c50,#2a1915 65%); color: white; text-align: center; }
+.empty-card > div { max-width: 360px; padding: 28px; }
+.empty-card > div > span { display: grid; place-items: center; width: 62px; height: 62px; margin: 0 auto 25px; border: 1px solid rgba(255,255,255,.4); border-radius: 50%; font-size: 26px; }
+.empty-card h1 { margin: 0; font: 42px/.98 Georgia,serif; }
+.empty-card p:not(.eyebrow) { opacity: .72; font: 12px/1.6 Georgia,serif; }
+.empty-card .primary { margin: 12px 0 18px; box-shadow: none; }
+.empty-card small { display: block; opacity: .48; font-size: 8px; }
+.empty-card .discover-loader { animation: placement-breathe 1.2s ease-in-out infinite; }
+
+/* Once a feature is selected, the Glam Room becomes an immersive portrait
+   camera instead of a dashboard-sized landscape card. */
+.glam-room.lesson-active { max-width: none; min-height: 100dvh; padding: 14px 20px 24px; background: radial-gradient(circle at 50% 20%,#51362f,#1a100e 68%); color: white; }
+.lesson-active .glam-heading { width: min(920px,100%); margin: 0 auto 10px; }
+.lesson-active .glam-heading h1 { font-size: 25px; color: white; -webkit-line-clamp: 1; }
+.lesson-active .glam-heading .eyebrow { color: #efaa94; }
+.lesson-active .glam-heading > div:first-child > p:last-child { display: none; }
+.lesson-active .offline-pill { background: rgba(255,255,255,.1); color: white; }
+.lesson-active .glam-grid { grid-template-columns: minmax(300px,calc((100dvh - 96px) * .5625)) minmax(320px,390px); justify-content: center; gap: 15px; }
+.lesson-active .glam-face-card { width: 100%; border-color: rgba(255,255,255,.16); border-radius: 26px; background: #170e0c; box-shadow: 0 25px 70px rgba(0,0,0,.35); }
+.lesson-active .feature-mirror-stage { width: 100%; aspect-ratio: 9/16; }
+.lesson-active .feature-mirror-stage > .silent-mirror { width: 100%; height: 100%; aspect-ratio: 9/16 !important; }
+.lesson-active .silent-mirror > video { object-fit: cover; }
+.lesson-active .glam-face-caption { display: none; }
+.lesson-active .glam-lesson-card { top: 14px; max-height: calc(100dvh - 28px); color: var(--brown); }
+.lesson-active .animated-guide-pip { top: 14px; }
+.lesson-active .animated-guide-pip.corner-right { right: 82px; }
+.lesson-active .mirror-toolbar { top: 50%; right: 9px; bottom: auto; left: auto; grid-template-columns: 1fr; width: 62px; padding: 5px; transform: translateY(-50%); border-radius: 18px; }
+.lesson-active .mirror-toolbar button { min-height: 52px; }
+
+@media (max-width: 800px) {
+  .creator-layout { grid-template-columns: 1fr; }
+  .creator-camera { position: relative; top: auto; max-width: 430px; margin: auto; }
+  .creator-details { max-width: 600px; margin: auto; }
+}
+
+@media (max-width: 600px) {
+  .creator-studio { padding-top: 18px; }
+  .creator-heading > div { margin-top: 15px; }
+  .creator-heading h1 { font-size: 48px; }
+  .creator-layout { gap: 16px; }
+  .creator-camera { width: calc(100% + 28px); margin-left: -14px; border-radius: 0; }
+  .creator-details { padding: 21px 16px; border-radius: 23px; }
+  .discover-feed { height: calc(100dvh - 58px); }
+  .discover-video { width: 100%; height: calc(100dvh - 58px); min-height: 540px; }
+  .glam-room.lesson-active { padding: 0 0 18px; }
+  .lesson-active .glam-heading { position: relative; z-index: 13; margin: 0; padding: 12px 13px 8px; background: #1b110f; }
+  .lesson-active .glam-heading h1 { font-size: 17px; }
+  .lesson-active .glam-heading .eyebrow { margin-bottom: 3px; font-size: 7px; }
+  .lesson-active .offline-pill { display: none; }
+  .lesson-active .glam-grid { display: block; }
+  .lesson-active .glam-face-card { max-width: none; border: 0; border-radius: 0; }
+  .lesson-active .feature-mirror-stage { width: 100%; aspect-ratio: 9/16; }
+  .lesson-active .glam-lesson-card { width: calc(100% - 14px); margin-top: -15px; }
+  .lesson-active .animated-guide-pip { top: 10px; width: 35%; }
+  .lesson-active .animated-guide-pip.corner-right { right: 74px; }
+  .lesson-active .mirror-toolbar { right: 7px; width: 58px; overflow: visible; }
+  .lesson-active .mirror-toolbar button { flex: auto; min-height: 47px; font-size: 6px; }
+}

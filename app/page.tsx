@@ -6,8 +6,10 @@ import { estimateFaceProfile, placementFor, type FaceProfile, type FaceShape, ty
 import { type LessonRegion, type Technique } from "@/lib/placement-map";
 import { PlacementGuide } from "./placement-guide";
 import { extractTutorialFrames, extractTutorialFramesFromUrl } from "@/lib/video-frames";
+import { CreatorStudio, DiscoverFeed, type RoutinePost } from "./routine-community";
+import { listRoutinePosts, saveRoutinePost, type StoredRoutinePost } from "@/lib/routine-posts";
 
-type View = "home" | "discover" | "my-looks" | "onboarding" | "face-scan" | "studio-intake" | "look-brief" | "preview" | "session" | "import" | "profile";
+type View = "home" | "discover" | "creator" | "my-looks" | "onboarding" | "face-scan" | "studio-intake" | "look-brief" | "preview" | "session" | "import" | "profile";
 type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; areas: LessonRegion[]; technique: Technique; referenceCue: string; adaptation: string; checkpoint: string; startTimeSeconds: number; endTimeSeconds: number; uncertain: boolean };
 type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[]; analysisScope: string; steps: LessonStep[]; sourceUrl?: string; sourceVideoAnalyzed?: boolean };
 const defaultLesson: LessonStep[] = [
@@ -79,7 +81,7 @@ function SilentMirror({ areas, technique, shape, stepNumber, paused, facingMode 
     const start=async()=>{
       setStatus("starting");setLivePoints([]);
       try {
-        media=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facingMode},width:{ideal:720},height:{ideal:720}},audio:false});
+        media=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facingMode},width:{ideal:720},height:{ideal:1280},aspectRatio:{ideal:9/16}},audio:false});
         if(disposed){media.getTracks().forEach(track=>track.stop());return;}
         if(!videoElement) return;
         videoElement.srcObject=media;await videoElement.play();
@@ -113,10 +115,10 @@ function SilentMirror({ areas, technique, shape, stepNumber, paused, facingMode 
     return()=>{disposed=true;cancelAnimationFrame(raf);landmarker?.close();media?.getTracks().forEach(track=>track.stop());if(videoElement)videoElement.srcObject=null;};
   },[facingMode,retry]);
   const copy:Record<MirrorStatus,string>={starting:"Starting your private mirror…",active:"Private mirror active · landmarks stay on this device","no-face":"No face detected. Center the selected feature in view.","poor-light":"Lighting is too low for stable placement. Face a soft light.",denied:"Camera permission was denied.",error:"The private mirror could not start on this device."};
-  return <div className={`silent-mirror${facingMode==="user"?" front-camera":""}`} style={{aspectRatio:String(feedAspect)}}>
+  return <div className={`silent-mirror${facingMode==="user"?" front-camera":""}`} style={{aspectRatio:"9 / 16"}}>
     <video ref={camera} className={facingMode==="user"?"mirrored":""} autoPlay muted playsInline/>
     {livePoints.length>0&&(
-      <PlacementGuide id="mirror" mirrored={facingMode==="user"} focused points={livePoints} areas={areas} technique={technique} shape={shape} aspect={feedAspect} stepNumber={stepNumber} paused={paused}/>
+      <PlacementGuide id="mirror" mirrored={facingMode==="user"} focused points={livePoints} areas={areas} technique={technique} shape={shape} aspect={feedAspect} displayAspect={9/16} stepNumber={stepNumber} paused={paused}/>
     )}
     <div className={`mirror-status ${status}`}><i/><span>{copy[status]}</span></div>
     {(status==="denied"||status==="error")&&<button className="mirror-retry" onClick={()=>setRetry(value=>value+1)}>Retry camera</button>}
@@ -166,6 +168,9 @@ export default function App() {
   const [previewConsent, setPreviewConsent] = useState(false);
   const [previewIntensity, setPreviewIntensity] = useState<"soft"|"reference"|"dramatic">("reference");
   const [tutorialVideoUrl, setTutorialVideoUrl] = useState("");
+  const [routinePosts,setRoutinePosts]=useState<RoutinePost[]>([]);
+  const [routineLoading,setRoutineLoading]=useState(true);
+  const routineUrls=useRef<string[]>([]);
   const fullLesson = brief?.steps?.length ? brief.steps : defaultLesson;
   const matchingLesson = selectedFeature ? fullLesson.filter(item=>stepMatchesFeature(item,selectedFeature)) : fullLesson;
   const activeLesson = selectedFeature && matchingLesson.length ? matchingLesson : fullLesson;
@@ -173,11 +178,13 @@ export default function App() {
   const profileComplete=Boolean(profileName&&answers.skin&&answers.tone&&answers.level&&answers.goal);
   const firstName=profileName.trim().split(/\s+/)[0]||"Bestie";
   const greeting=(()=>{const hour=new Date().getHours();return hour<12?"Good morning":hour<18?"Good afternoon":"Good evening";})();
-  const createFlowActive=["studio-intake","face-scan","look-brief","preview","session"].includes(view);
+  const createFlowActive=view==="creator";
+  const homeFlowActive=["home","studio-intake","face-scan","look-brief","preview","session"].includes(view);
+  const immersiveLesson=view==="session"&&Boolean(selectedFeature);
 
   const go = (v: View) => {
     let next=v;
-    if(["home","discover","studio-intake","my-looks","profile"].includes(v)&&!profileComplete)next="onboarding";
+    if(["home","discover","creator","studio-intake","my-looks","profile"].includes(v)&&!profileComplete)next="onboarding";
     if(v==="session"&&!brief)next="home";
     if(v==="preview"&&(!brief||mapStatus!=="ready"))next=brief?"face-scan":"studio-intake";
     setView(next);window.scrollTo(0,0);
@@ -190,6 +197,16 @@ export default function App() {
       if(parsed.name&&parsed.answers?.skin&&parsed.answers?.tone&&parsed.answers?.level&&parsed.answers?.goal)queueMicrotask(()=>{setProfileName(parsed.name||"");setProfileEmail(parsed.email||"");setAnswers(parsed.answers||{});setView("home");});
     } catch {/* An unreadable local profile simply starts fresh. */}
   },[]);
+  useEffect(()=>{
+    let cancelled=false;
+    void listRoutinePosts().then(posts=>{
+      if(cancelled)return;
+      const visible=posts.map(post=>{const videoUrl=URL.createObjectURL(post.video);routineUrls.current.push(videoUrl);return {...post,videoUrl};});
+      setRoutinePosts(visible);setRoutineLoading(false);
+    }).catch(()=>{setRoutineLoading(false);});
+    return()=>{cancelled=true;};
+  },[]);
+  useEffect(()=>()=>{routineUrls.current.forEach(url=>URL.revokeObjectURL(url));routineUrls.current=[];},[]);
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
     const apply = () => setGuideMotion(!query.matches);
@@ -199,13 +216,27 @@ export default function App() {
   }, []);
   useEffect(() => () => { if (prepPhoto) URL.revokeObjectURL(prepPhoto); }, [prepPhoto]);
   useEffect(() => () => { if (tutorialVideoUrl) URL.revokeObjectURL(tutorialVideoUrl); }, [tutorialVideoUrl]);
-  const nav = <><header className="nav-shell app-nav-shell"><nav className="nav app-nav"><Logo home={() => go("home")} />{profileComplete&&view!=="onboarding"?<button className="account-chip" onClick={()=>go("profile")}><span>{firstName.charAt(0).toUpperCase()}</span><b>{firstName}</b></button>:<span className="local-profile-note">Private profile · this device</span>}</nav></header>{profileComplete&&view!=="onboarding"&&<nav className="bottom-nav" aria-label="Primary navigation">
-    <button className={view==="home"?"active":""} onClick={()=>go("home")}><i>⌂</i><span>Home</span></button>
+  const nav = <>{!immersiveLesson&&<header className="nav-shell app-nav-shell"><nav className="nav app-nav"><Logo home={() => go("home")} />{profileComplete&&view!=="onboarding"?<button className="account-chip" onClick={()=>go("profile")}><span>{firstName.charAt(0).toUpperCase()}</span><b>{firstName}</b></button>:<span className="local-profile-note">Private profile · this device</span>}</nav></header>}{!immersiveLesson&&profileComplete&&view!=="onboarding"&&<nav className="bottom-nav" aria-label="Primary navigation">
+    <button className={homeFlowActive?"active":""} onClick={()=>go("home")}><i>⌂</i><span>Home</span></button>
     <button className={view==="discover"?"active":""} onClick={()=>go("discover")}><i>◇</i><span>Discover</span></button>
-    <button className={`create-tab${createFlowActive?" active":""}`} onClick={()=>go("studio-intake")}><i>＋</i><span>Create</span></button>
+    <button className={`create-tab${createFlowActive?" active":""}`} onClick={()=>go("creator")}><i>＋</i><span>Create</span></button>
     <button className={view==="my-looks"?"active":""} onClick={()=>go("my-looks")}><i>♡</i><span>My Looks</span></button>
     <button className={view==="profile"?"active":""} onClick={()=>go("profile")}><i>○</i><span>Profile</span></button>
   </nav>}</>;
+
+  const publishRoutine=async(post:StoredRoutinePost)=>{
+    await saveRoutinePost(post);
+    const videoUrl=URL.createObjectURL(post.video);routineUrls.current.push(videoUrl);
+    setRoutinePosts(current=>[{...post,videoUrl},...current.filter(item=>item.id!==post.id)]);
+    go("discover");
+  };
+
+  const tryRoutine=(post:RoutinePost)=>{
+    if(tutorialVideoUrl)URL.revokeObjectURL(tutorialVideoUrl);
+    const file=new File([post.video],post.fileName||`${post.title}.webm`,{type:post.video.type||"video/webm"});
+    setLookFile(file);setLookUrl("");setLookNotes([post.title,post.description].filter(Boolean).join(" — "));setTutorialVideoUrl(URL.createObjectURL(file));setLessonError("");
+    go("studio-intake");
+  };
 
   const analyzePreparationPhoto = async (file: File) => {
     if (prepPhoto) URL.revokeObjectURL(prepPhoto);
@@ -471,6 +502,8 @@ export default function App() {
     return <>{nav}<main className="onboarding page-enter"><div className="progress"><span style={{width:`${(onboard+1)*20}%`}} /></div><button className="back" onClick={() => setOnboard(onboard-1)}>← Back</button><section className="question-card"><p className="eyebrow">{q[1]}</p><h1>{q[2]}</h1><p className="subcopy">This personalizes technique—not your beauty.</p><div className="choice-grid">{q[3].map(o => <button key={o} className={answers[q[0]]===o?"selected":""} onClick={() => setAnswers({...answers,[q[0]]:o})}>{o}<b>{answers[q[0]]===o?"✓":"○"}</b></button>)}</div><button className="primary wide" disabled={!answers[q[0]]} onClick={() => onboard===4?finishProfile():setOnboard(onboard+1)}>{onboard===4?"Open Makeup Bestie":"Continue"} →</button></section></main></>;
   }
 
+  if(view==="creator")return <>{nav}<CreatorStudio creator={profileName} products={productOptions} onCancel={()=>go("home")} onPublish={publishRoutine}/></>;
+
   if (view === "session") {
     const placement = shape ? placementFor(shape) : null;
     const placementKey = currentLesson.technique as keyof ReturnType<typeof placementFor>;
@@ -546,14 +579,13 @@ export default function App() {
 
   if (view === "import") return <>{nav}<main className="simple-page page-enter app-screen"><section className="import-card"><div className="import-icon">▶</div><p className="eyebrow">Tutorial-aware lessons</p><h1>Bring the tutorial. We’ll make it yours.</h1><p>Paste a public tutorial link or upload a permitted video. After the tutorial is analyzed, Makeup Bestie asks for today’s face photo and adapts the lesson.</p><button className="primary wide" onClick={()=>go("studio-intake")}>Create my lesson →</button></section></main></>;
 
-  if(view==="discover")return <>{nav}<main className="app-screen discover-screen page-enter"><header className="screen-heading"><div><p className="eyebrow">Discover</p><h1>Routine Coaches,<br/><em>made by creators.</em></h1></div><p>Browse creator-trained makeup routines here once publishing, rights review, and payments are connected.</p></header><div className="discover-search"><span>⌕</span><input aria-label="Search Routine Coaches" placeholder="Search looks, techniques, or skin expertise" disabled/><button disabled>Filter</button></div><section className="discover-preview"><div className="discover-orbit">✦</div><p className="eyebrow">Marketplace foundation</p><h2>No pretend listings.</h2><p>Makeup Bestie will only show Routine Coaches from creators who have uploaded, reviewed, and authorized their own tutorials. Until that system is connected, this page stays honest.</p><button className="primary" onClick={()=>go("studio-intake")}>Create from my tutorial →</button></section><section className="category-strip" aria-label="Planned discovery categories">{["Soft glam","Beginner friendly","Deep-skin expertise","Bridal","Editorial","Mature skin"].map(item=><span key={item}>{item}</span>)}</section></main></>;
+  if(view==="discover")return <>{nav}<DiscoverFeed posts={routinePosts} loading={routineLoading} onTry={tryRoutine} onCreate={()=>go("creator")}/></>;
 
   if(view==="my-looks")return <>{nav}<main className="app-screen looks-screen page-enter"><header className="screen-heading"><div><p className="eyebrow">My Looks</p><h1>Your beauty shelf.</h1></div><p>Current lessons and intentionally saved looks live here. Nothing is presented as purchased until marketplace payments exist.</p></header>{brief?<article className="saved-look-card">{previewImage||prepPhoto?<img src={previewImage||prepPhoto} alt={previewImage?"Your personalized finished target":"Your current lesson face photo"}/>:<div className="saved-look-placeholder">✦</div>}<div><small>{saveSessionPhotos?"SAVED LOOK":"CURRENT SESSION · NOT SAVED"}</small><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} tutorial steps</p><div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Review look</button><button className="primary" disabled={mapStatus!=="ready"} onClick={()=>go("session")}>Continue lesson →</button></div></div></article>:<section className="looks-empty"><span>♡</span><h2>Your first look starts with a tutorial.</h2><p>Paste a link or upload a permitted video, then Makeup Bestie will turn it into a personalized lesson.</p><button className="primary" onClick={()=>go("studio-intake")}>Create my first look →</button></section>}</main></>;
 
   if (view === "profile") {
     // Every number here is read from real local state rather than invented.
     const savedLooks = brief && saveSessionPhotos ? 1 : 0;
-    const savedFaceImages = prepPhoto && saveSessionPhotos ? 1 : 0;
     return <>{nav}<main className="profile app-screen page-enter">
       <section className="profile-top">
         <div className="avatar large">{firstName.charAt(0).toUpperCase()}</div>
@@ -563,7 +595,7 @@ export default function App() {
       <div className="stat-row">
         <div><b>{savedLooks}</b><span>Saved looks</span></div>
         <div><b>{mapStatus==="ready"?"Local":"Not yet"}</b><span>Face mapping</span></div>
-        <div><b>{savedFaceImages}</b><span>Saved face images</span></div>
+        <div><b>{routinePosts.length}</b><span>Routine posts</span></div>
       </div>
       <section className="profile-details"><div><small>SKIN</small><b>{answers.skin}</b></div><div><small>COMPLEXION</small><b>{answers.tone}</b></div><div><small>EXPERIENCE</small><b>{answers.level}</b></div><div><small>MAKEUP GOAL</small><b>{answers.goal}</b></div></section>
       <p className="profile-note">Your beauty-profile answers are stored only in this browser for this prototype. Face photos and tutorial media are not added to the profile. Cloud accounts and cross-device sync still require an authentication and database phase.</p>

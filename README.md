@@ -1,6 +1,6 @@
 # Makeup Bestie
 
-A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. It turns an accessible public tutorial link or permitted video upload into personalized, feature-by-feature placement lessons using a single face scan. The mobile-first app shell has Home, Discover, Create, My Looks, and Profile tabs; choosing a feature opens a silent local mirror with a small animated placement preview.
+A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face Landmarker, and OpenAI. It turns an accessible public tutorial link or permitted video upload into personalized, feature-by-feature placement lessons using a single face scan. The mobile-first app shell has Home, Discover, Create, My Looks, and Profile tabs. Create records or uploads creator-owned routine posts; Discover presents those local posts in a vertical video feed; choosing a feature opens a portrait 9:16 mirror with a small animated placement preview.
 
 ## Launch flow
 
@@ -12,11 +12,21 @@ A privacy-first, tutorial-aware makeup coach built with Next.js, MediaPipe Face 
 6. Choose an available facial area such as eyes, cheeks, lips, brows, nose, complexion, or jaw.
 7. Follow only the analyzed tutorial steps affecting that feature in the large silent live mirror, with on-device placement tracking, a movable animated picture-in-picture guide, unified camera controls, and a collapsible mobile instruction panel.
 
-The bottom navigation keeps the core product areas one tap away: Home for the personalized greeting and routine composer, Discover for the honest future Routine Coach marketplace, Create for the tutorial-first lesson flow, My Looks for current and deliberately saved lessons, and Profile for local beauty preferences.
+The bottom navigation keeps the core product areas one tap away: Home for the personalized greeting and external-routine composer, Discover for vertical creator routine posts, Create for recording or uploading a creator-owned routine, My Looks for current and deliberately saved lessons, and Profile for local beauty preferences and publishing totals.
+
+## Creator and Discover prototype
+
+- Create supports a silent 9:16 camera recording or a permitted MP4, WebM, or MOV upload.
+- Publishing requires a title and an explicit rights confirmation. It never claims the routine was AI-analyzed at publish time.
+- The real video blob and post metadata are stored in IndexedDB on the current device. They are not visible to other users or devices.
+- Discover renders those real local posts in a full-height, scroll-snapping video feed. There are no fake creator profiles, inventory, prices, or purchases.
+- **Try this routine** hands the exact published video into the existing tutorial analyzer. A lesson is only created after real frames are successfully reviewed.
+- Shared publishing still requires authentication, durable cloud video storage, a database, rights moderation, and reporting. Payments should be connected only after those controls exist.
 
 ## Privacy
 
 - The Glam Room never opens a microphone. The camera starts only after the user explicitly chooses a facial area, and it can be stopped immediately.
+- The local creator recorder also keeps the microphone off. Uploaded creator videos may contain audio, but the current tutorial analysis remains visual and labels spoken-only details as uncertain.
 - Beauty-profile answers are stored in the browser's local storage for this prototype. They are not a cloud account and do not sync across devices.
 - Facial landmarks are computed on-device from the selected face-scan photo and anchor the placement overlays.
 - Face shape is a fallible, editable estimate.
@@ -66,7 +76,7 @@ Never put the key in source, browser code, GitHub, issues, screenshots, logs, or
 
 Raw video is not sent to a general-purpose model. The browser samples the visual timeline, and spoken-only details are explicitly treated as uncertain. MediaPipe assets currently load from Google/jsDelivr; self-host them before enforcing a restrictive production CSP.
 
-Discover is currently an honest marketplace foundation rather than a simulated store. Creator publishing, tutorial-rights review, purchases, and account-backed ownership must be connected before real Routine Coaches appear. The live voice coach is likewise not simulated in this build; the present Glam Room uses silent local guidance.
+Discover is currently a functional on-device creator feed rather than a simulated shared store. Cross-user creator publishing, tutorial-rights review, purchases, and account-backed ownership must be connected before it becomes a marketplace. The live voice coach is likewise not simulated in this build; the present Glam Room uses silent local guidance.
 
 The browser accepts either a link or an upload. For link-only input, the server checks direct video responses and public HTML video metadata, then streams accessible media so the browser can sample it. Many TikTok, Instagram, YouTube, private, login-gated, DRM-protected, and dynamically assembled videos will not expose usable media. Those cases return an honest upload request and never generate a generic lesson.
 

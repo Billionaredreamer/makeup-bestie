@@ -13,6 +13,8 @@ export type GuideProps = {
   points: Point[]; areas: LessonRegion[]; technique: Technique; shape: FaceShape | null;
   /** Photo width ÷ height, so the chart is never stretched out of shape. */
   aspect?: number;
+  /** Optional portrait display crop. Geometry still uses the uncropped camera aspect. */
+  displayAspect?: number;
   id?: string;
   /** A finished step: outline only, kept on the chart as visual buildup. */
   soft?: boolean;
@@ -27,7 +29,7 @@ export type GuideProps = {
 };
 
 export function PlacementGuide({
-  points, areas, technique, shape, aspect = 0.75, id = "current",
+  points, areas, technique, shape, aspect = 0.75, displayAspect, id = "current",
   soft = false, stepNumber, paused = false, focused = false, mirrored = false,
 }: GuideProps) {
   const zones = useMemo(
@@ -35,12 +37,24 @@ export function PlacementGuide({
     [points, areas, technique, shape, aspect, focused],
   );
   if (!zones.length) return null;
+  const labelPosition = (sourceX: number, sourceY: number) => {
+    let x = sourceX / aspect;
+    let y = sourceY;
+    if (displayAspect && Math.abs(displayAspect - aspect) > .001) {
+      if (aspect > displayAspect) x = (sourceX - (aspect - displayAspect) / 2) / displayAspect;
+      else {
+        const visibleHeight = aspect / displayAspect;
+        y = (sourceY - (1 - visibleHeight) / 2) / visibleHeight;
+      }
+    }
+    return { left: `${Math.max(2, Math.min(98, x * 100))}%`, top: `${Math.max(2, Math.min(98, y * 100))}%` };
+  };
   const markerId = `guide-arrow-${id.replace(/[^a-z0-9-]/gi, "")}`;
   const description = `${technique} placement on ${zones.map(zone => zone.label.toLowerCase()).join(", ")}`;
   return <>
     <svg
       className={`placement-overlay technique-${technique}${soft ? " completed-placement" : ""}${paused ? " motion-paused" : ""}`}
-      viewBox={`0 0 ${aspect} 1`} preserveAspectRatio="xMidYMid meet"
+      viewBox={`0 0 ${aspect} 1`} preserveAspectRatio={displayAspect ? "xMidYMid slice" : "xMidYMid meet"}
       role="img" aria-label={soft ? `Completed: ${description}` : `Where to apply — ${description}`}
     >
       <defs>
@@ -68,10 +82,7 @@ export function PlacementGuide({
             // Labels sit outward from the face, so left and right zones at the
             // same height never print on top of one another.
             className={`zone-badge technique-${technique} ${zone.side === 0 ? "side-center" : (zone.side === -1) !== mirrored ? "side-left" : "side-right"}`}
-            style={{
-              left: `${((mirrored ? aspect - zone.anchor.x : zone.anchor.x) / aspect) * 100}%`,
-              top: `${zone.anchor.y * 100}%`,
-            }}
+            style={labelPosition(mirrored ? aspect - zone.anchor.x : zone.anchor.x, zone.anchor.y)}
           >
             <b>{String(stepNumber).padStart(2, "0")}</b>
             {/* Name the area only when a step marks one place. Paired zones are
