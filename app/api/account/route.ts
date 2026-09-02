@@ -8,11 +8,17 @@ export async function GET() {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0,0,0,0);
-  const [{ data: profile }, { data: subscription }, { data: usage }] = await Promise.all([
+  const [profileResult, subscriptionResult, usageResult] = await Promise.all([
     supabase.from("profiles").select("display_name,skin_type,skin_tone,experience,makeup_goal,products,face_shape").eq("user_id",auth.user.id).maybeSingle(),
     supabase.from("subscriptions").select("plan,status,current_period_end,cancel_at_period_end").eq("user_id",auth.user.id).maybeSingle(),
     supabase.from("ai_usage_events").select("operation,status,created_at").eq("user_id",auth.user.id).in("status",["reserved","completed"]).gte("created_at",monthStart.toISOString()),
   ]);
+  if (profileResult.error || subscriptionResult.error || usageResult.error) {
+    return NextResponse.json({ error: "Your account could not be loaded. Please refresh and try again." }, { status: 500 });
+  }
+  const profile = profileResult.data;
+  const subscription = subscriptionResult.data;
+  const usage = usageResult.data;
   const recentReservationCutoff = Date.now() - 15 * 60 * 1000;
   const countedUsage = (usage || []).filter(item => item.status === "completed" || new Date(item.created_at).getTime() >= recentReservationCutoff);
   return NextResponse.json({

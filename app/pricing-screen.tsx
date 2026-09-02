@@ -15,10 +15,13 @@ async function readBillingPayload(response: Response): Promise<BillingPayload> {
 export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnapshot;onRefresh:()=>Promise<void>;onSignOut:()=>Promise<void>}) {
   const [busy,setBusy]=useState<SubscriptionPlan|null>(null);
   const [error,setError]=useState("");
+  const [confirming,setConfirming]=useState(false);
   useEffect(()=>{
     if(new URLSearchParams(window.location.search).get("checkout")!=="success")return;
-    let attempts=0;const timer=window.setInterval(()=>{attempts+=1;void onRefresh();if(attempts>=8)window.clearInterval(timer);},1500);
-    return()=>window.clearInterval(timer);
+    let cancelled=false;let attempts=0;let timer=0;queueMicrotask(()=>{if(!cancelled)setConfirming(true);});
+    const poll=async()=>{attempts+=1;await onRefresh();if(cancelled)return;if(attempts>=10){setConfirming(false);setError("Your payment completed, but plan activation is taking longer than expected. Refresh this page in a moment; you will not be charged twice.");return;}timer=window.setTimeout(()=>void poll(),1500);};
+    void poll();
+    return()=>{cancelled=true;window.clearTimeout(timer);};
   },[onRefresh]);
   const checkout=async(plan:SubscriptionPlan)=>{
     setBusy(plan);setError("");
@@ -29,9 +32,10 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
     <header className="pricing-header"><div className="auth-mark"><span>m</span><b>makeup bestie</b></div><button onClick={onSignOut}>Sign out</button></header>
     <section className="pricing-intro"><p className="eyebrow">Your beauty profile is ready</p><h1>Choose how often we<br/><em>make a look yours.</em></h1><p>Both plans remember your skin, products, preferences, and saved lessons. Cancel anytime from your account.</p></section>
     <section className="pricing-grid">
-      <article><small>MAKEUP BESTIE PLUS</small><h2><b>$12.99</b><span>/ month</span></h2><p>For learning new looks throughout the month.</p><ul><li>10 tutorial adaptations each month</li><li>One personalized preview per adaptation</li><li>Private saved looks and beauty profile</li><li>Unlimited lesson replays and Glam Room use</li></ul><button className="outline" disabled={Boolean(busy)} onClick={()=>checkout("plus")}>{busy==="plus"?"Opening checkout…":"Choose Plus →"}</button></article>
-      <article className="featured"><div className="plan-ribbon">MOST FLEXIBLE</div><small>MAKEUP BESTIE UNLIMITED</small><h2><b>$49.99</b><span>/ month</span></h2><p>For beauty lovers creating and practicing constantly.</p><ul><li>Unlimited adaptations for normal personal use</li><li>One personalized preview per adaptation</li><li>Private saved looks and beauty profile</li><li>Reasonable anti-automation protection only</li></ul><button className="primary" disabled={Boolean(busy)} onClick={()=>checkout("unlimited")}>{busy==="unlimited"?"Opening checkout…":"Choose Unlimited →"}</button></article>
+      <article><small>MAKEUP BESTIE PLUS</small><h2><b>$12.99</b><span>/ month</span></h2><p>For learning new looks throughout the month.</p><ul><li>10 tutorial adaptations each month</li><li>One personalized preview per adaptation</li><li>Private saved looks and beauty profile</li><li>Unlimited lesson replays and Glam Room use</li></ul><button className="outline" disabled={Boolean(busy)||confirming} onClick={()=>checkout("plus")}>{busy==="plus"?"Opening checkout…":"Choose Plus →"}</button></article>
+      <article className="featured"><div className="plan-ribbon">MOST FLEXIBLE</div><small>MAKEUP BESTIE UNLIMITED</small><h2><b>$49.99</b><span>/ month</span></h2><p>For beauty lovers creating and practicing constantly.</p><ul><li>Unlimited adaptations for normal personal use</li><li>One personalized preview per adaptation</li><li>Private saved looks and beauty profile</li><li>Reasonable anti-automation protection only</li></ul><button className="primary" disabled={Boolean(busy)||confirming} onClick={()=>checkout("unlimited")}>{busy==="unlimited"?"Opening checkout…":"Choose Unlimited →"}</button></article>
     </section>
+    {confirming&&<p className="pricing-confirming">Payment received. We’re securely activating your plan…</p>}
     {error&&<p className="pricing-error">{error}</p>}
     <p className="pricing-footnote">Secure checkout is provided by Stripe. Makeup Bestie never receives or stores your card number. Your current usage: {account.usage.tutorialAnalyses} tutorial adaptations this month.</p>
   </main>;

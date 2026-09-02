@@ -13,7 +13,8 @@ export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user?.email) return NextResponse.json({ error: "Sign in before choosing a plan." }, { status: 401 });
-  const body = await request.json();
+  const body = await request.json().catch(() => null) as { plan?: unknown } | null;
+  if (!body) return NextResponse.json({ error: "Choose a valid Makeup Bestie plan." }, { status: 400 });
   const plan = body.plan === "unlimited" ? "unlimited" : body.plan === "plus" ? "plus" : null;
   if (!plan) return NextResponse.json({ error: "Choose a valid Makeup Bestie plan." }, { status: 400 });
   const price = priceForPlan(plan);

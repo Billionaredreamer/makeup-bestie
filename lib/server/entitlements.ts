@@ -1,4 +1,5 @@
 import { createSupabaseServerClient, serverCloudConfigured } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export type AiOperation = "tutorial_analysis" | "preview_generation";
 
@@ -28,7 +29,10 @@ export async function finishAiUsage(eventId: string | null, success: boolean) {
   if (!eventId) return;
   try {
     const supabase = await createSupabaseServerClient();
-    await supabase.rpc("finish_ai_usage", { usage_event_id: eventId, succeeded: success });
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
+    const admin = createSupabaseAdminClient();
+    await admin.from("ai_usage_events").update({ status: success ? "completed" : "failed" }).eq("id", eventId).eq("user_id", auth.user.id);
   } catch {
     // Entitlement cleanup must never replace the real API response.
   }

@@ -53,7 +53,7 @@ Do not put real secrets in source control. `.env*` is ignored by Git. Add values
 ### 1. Supabase
 
 1. Create a Supabase project.
-2. Run `supabase/migrations/202609010001_launch_accounts.sql` in the Supabase SQL editor (or apply it with the Supabase CLI).
+2. Apply every SQL file in `supabase/migrations` in filename order using the Supabase SQL editor or CLI. The later hardening migration makes usage completion server-only.
 3. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and the server-only `SUPABASE_SECRET_KEY`.
 4. In **Authentication → URL Configuration**, set the site URL and add these redirect URLs:
    - `http://localhost:3000/auth/callback`
@@ -74,6 +74,7 @@ The migration creates private profiles, subscriptions, saved looks, AI-usage rec
 4. For local webhook testing, forward Stripe events to `http://localhost:3000/api/billing/webhook` and set `STRIPE_WEBHOOK_SECRET` to the signing secret.
 5. Listen for:
    - `checkout.session.completed`
+   - `checkout.session.async_payment_succeeded`
    - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
@@ -101,8 +102,8 @@ Manual launch checks should cover signup confirmation, sign-in/reset, both Strip
 
 1. Import `Billionaredreamer/makeup-bestie` in Vercel and keep the Next.js preset.
 2. Add every variable from `.env.example` in **Project Settings → Environment Variables**. Mark OpenAI, Supabase secret, Stripe secret, and webhook secret as sensitive. Never copy them into GitHub or browser code.
-3. Set `NEXT_PUBLIC_APP_URL` to `https://makeup-bestie-sandra23.vercel.app` (or the final custom domain).
-4. Create the production Stripe webhook at `https://makeup-bestie-sandra23.vercel.app/api/billing/webhook` and save its signing secret only in Vercel.
+3. Set `NEXT_PUBLIC_APP_URL` to `https://www.makeupbestie.app` for production.
+4. Create the production Stripe webhook at `https://www.makeupbestie.app/api/billing/webhook` and save its signing secret only in Vercel.
 5. Add the exact production callback/reset URLs in Supabase.
 6. Redeploy after environment changes and run the manual checks above in Stripe test mode before enabling live payments.
 
