@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { finishAiUsage, reserveAiUsage } from "@/lib/server/entitlements";
 /* eslint-disable @typescript-eslint/no-explicit-any -- OpenAI REST response items are narrowed by runtime type tags */
 
 export const runtime = "nodejs";
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest) {
   const duration = Math.max(0, Math.min(Number(body.duration) || 0, 3600));
   if (frames.length < 4) return NextResponse.json({ error: "The actual tutorial video is required. We could not extract enough frames to analyze its sequence." }, { status: 400 });
   if (frames.some(frame => frame.length > 900_000)) return NextResponse.json({ error: "One or more tutorial frames are too large to analyze." }, { status: 413 });
+  const reservation = await reserveAiUsage("tutorial_analysis", req.headers.get("x-usage-key") || crypto.randomUUID());
+  if (!reservation.allowed) return NextResponse.json({ error: reservation.message, code: reservation.code }, { status: reservation.code === "authentication" ? 401 : reservation.code === "subscription_required" ? 402 : 429 });
 
   const schema = { type: "object", additionalProperties: false, required: ["title","summary","adaptation","difficulty","estimatedMinutes","products","steps","uncertainties","analysisScope"], properties: {
     title: { type: "string" }, summary: { type: "string" }, adaptation: { type: "string" }, difficulty: { type: "string" }, estimatedMinutes: { type: "integer" },
@@ -45,13 +48,15 @@ export async function POST(req: NextRequest) {
       })
     });
     const data = await response.json();
-    if (!response.ok) return NextResponse.json({ error: response.status===429 ? "Tutorial analysis usage limit reached. Wait a moment or try a shorter tutorial." : data?.error?.message || "Tutorial analysis failed." }, { status: response.status });
+    if (!response.ok) { await finishAiUsage(reservation.eventId,false); return NextResponse.json({ error: response.status===429 ? "Tutorial analysis usage limit reached. Wait a moment or try a shorter tutorial." : data?.error?.message || "Tutorial analysis failed." }, { status: response.status }); }
     try {
       const lesson = JSON.parse(responseText(data));
       lesson.analysisScope = `Analyzed ${frames.length} ordered frames sampled across the uploaded ${Math.round(duration)}-second tutorial, then adapted the observed sequence to the supplied face estimate, skin preferences, experience, and makeup bag.`;
+      await finishAiUsage(reservation.eventId,true);
       return NextResponse.json(lesson);
-    } catch { return NextResponse.json({ error: data?.status === "incomplete" ? "The AI could not finish the lesson format. Please try once more." : "The personalized lesson could not be formatted." }, { status: 502 }); }
+    } catch { await finishAiUsage(reservation.eventId,false); return NextResponse.json({ error: data?.status === "incomplete" ? "The AI could not finish the lesson format. Please try once more." : "The personalized lesson could not be formatted." }, { status: 502 }); }
   } catch {
+    await finishAiUsage(reservation.eventId,false);
     return NextResponse.json({ error: "The tutorial analysis service could not be reached." }, { status: 502 });
   }
 }

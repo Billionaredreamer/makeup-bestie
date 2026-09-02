@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { finishAiUsage, reserveAiUsage } from "@/lib/server/entitlements";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,8 @@ export async function POST(req: NextRequest) {
   const intensity = String(form.get("intensity") || "reference");
   if (!(face instanceof File) || !face.type.startsWith("image/") || face.size > 3_500_000)
     return NextResponse.json({ error: "Choose a JPG, PNG, or WebP bare-face photo under 3.5 MB for preview generation." }, { status: 400 });
+  const reservation = await reserveAiUsage("preview_generation", req.headers.get("x-usage-key") || crypto.randomUUID());
+  if (!reservation.allowed) return NextResponse.json({ error: reservation.message, code: reservation.code }, { status: reservation.code === "authentication" ? 401 : reservation.code === "subscription_required" ? 402 : 429 });
   const body = new FormData();
   body.append("model", process.env.OPENAI_IMAGE_MODEL || "gpt-image-2");
   body.append("image[]", face, "bare-face.jpg");
@@ -21,11 +24,13 @@ export async function POST(req: NextRequest) {
   try {
     const response = await fetch("https://api.openai.com/v1/images/edits", { method:"POST", headers:{ Authorization:`Bearer ${key}` }, body });
     const data = await response.json();
-    if (!response.ok) return NextResponse.json({ error:response.status===429?"Preview generation usage limit reached. Wait a moment before trying again.":data?.error?.message || "Preview generation is temporarily unavailable." }, { status:response.status });
+    if (!response.ok) { await finishAiUsage(reservation.eventId,false); return NextResponse.json({ error:response.status===429?"Preview generation usage limit reached. Wait a moment before trying again.":data?.error?.message || "Preview generation is temporarily unavailable." }, { status:response.status }); }
     const encoded = data?.data?.[0]?.b64_json;
-    if (!encoded) return NextResponse.json({ error:"The preview could not be generated." }, { status:502 });
+    if (!encoded) { await finishAiUsage(reservation.eventId,false); return NextResponse.json({ error:"The preview could not be generated." }, { status:502 }); }
+    await finishAiUsage(reservation.eventId,true);
     return NextResponse.json({ image:`data:image/png;base64,${encoded}` });
   } catch {
+    await finishAiUsage(reservation.eventId,false);
     return NextResponse.json({ error:"The preview service could not be reached. Please try again." }, { status:502 });
   }
 }

@@ -1,13 +1,17 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- preparation photos use temporary local blob URLs */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { estimateFaceProfile, placementFor, type FaceProfile, type FaceShape, type Point } from "@/lib/face-analysis";
 import { type LessonRegion, type Technique } from "@/lib/placement-map";
 import { PlacementGuide } from "./placement-guide";
 import { extractTutorialFrames, extractTutorialFramesFromUrl } from "@/lib/video-frames";
 import { CreatorStudio, DiscoverFeed, type RoutinePost } from "./routine-community";
 import { listRoutinePosts, saveRoutinePost, type StoredRoutinePost } from "@/lib/routine-posts";
+import { AuthScreen, CloudConfigurationScreen, CloudLoadingScreen, type LaunchAccount, useLaunchAccount } from "./launch-account";
+import { ManageBillingButton, PricingScreen } from "./pricing-screen";
+import type { SavedLookRecord } from "@/lib/account-types";
 
 type View = "home" | "discover" | "creator" | "my-looks" | "onboarding" | "face-scan" | "studio-intake" | "look-brief" | "preview" | "session" | "import" | "profile";
 type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; areas: LessonRegion[]; technique: Technique; referenceCue: string; adaptation: string; checkpoint: string; startTimeSeconds: number; endTimeSeconds: number; uncertain: boolean };
@@ -127,7 +131,7 @@ function SilentMirror({ areas, technique, shape, stepNumber, paused, facingMode 
 
 function Logo({ home }: { home: () => void }) { return <button className="logo" onClick={home}><span>m</span> makeup bestie</button>; }
 
-export default function App() {
+function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [view, setView] = useState<View>("onboarding");
   const [onboard, setOnboard] = useState(0);
   const [profileName,setProfileName]=useState("");
@@ -170,6 +174,9 @@ export default function App() {
   const [tutorialVideoUrl, setTutorialVideoUrl] = useState("");
   const [routinePosts,setRoutinePosts]=useState<RoutinePost[]>([]);
   const [routineLoading,setRoutineLoading]=useState(true);
+  const [savedLooks,setSavedLooks]=useState<SavedLookRecord[]>([]);
+  const [saveStatus,setSaveStatus]=useState<"idle"|"saving"|"saved"|"error">("idle");
+  const [saveError,setSaveError]=useState("");
   const routineUrls=useRef<string[]>([]);
   const fullLesson = brief?.steps?.length ? brief.steps : defaultLesson;
   const matchingLesson = selectedFeature ? fullLesson.filter(item=>stepMatchesFeature(item,selectedFeature)) : fullLesson;
@@ -190,13 +197,26 @@ export default function App() {
     setView(next);window.scrollTo(0,0);
   };
   useEffect(()=>{
-    try {
+    const cloudProfile=account.snapshot?.profile;
+    if(cloudProfile){queueMicrotask(()=>{setProfileName(cloudProfile.display_name);setProfileEmail(account.snapshot?.user.email||"");setAnswers({skin:cloudProfile.skin_type,tone:cloudProfile.skin_tone,level:cloudProfile.experience,goal:cloudProfile.makeup_goal});setOwnedProducts(cloudProfile.products||[]);if(cloudProfile.face_shape)setShape(cloudProfile.face_shape as FaceShape);setView("home");});return;}
+    if(account.configured&&account.user){
+      let localName=String(account.user.user_metadata?.display_name||"");let localAnswers:Record<string,string>={};
+      try{const saved=window.localStorage.getItem("makeup-bestie-profile-v1");if(saved){const parsed=JSON.parse(saved) as {name?:string;answers?:Record<string,string>};localName=parsed.name||localName;localAnswers=parsed.answers||{};}}catch{/* Start with a clean cloud profile. */}
+      queueMicrotask(()=>{setProfileName(localName);setProfileEmail(account.user?.email||"");setAnswers(localAnswers);setView("onboarding");});return;
+    }
+    if(!account.configured)try {
       const saved=window.localStorage.getItem("makeup-bestie-profile-v1");
       if(!saved)return;
       const parsed=JSON.parse(saved) as {name?:string;email?:string;answers?:Record<string,string>};
       if(parsed.name&&parsed.answers?.skin&&parsed.answers?.tone&&parsed.answers?.level&&parsed.answers?.goal)queueMicrotask(()=>{setProfileName(parsed.name||"");setProfileEmail(parsed.email||"");setAnswers(parsed.answers||{});setView("home");});
     } catch {/* An unreadable local profile simply starts fresh. */}
-  },[]);
+  },[account.configured,account.snapshot,account.user]);
+  const loadSavedLooks=useCallback(async()=>{
+    if(!account.configured||!account.user)return;
+    const response=await fetch("/api/saved-looks",{cache:"no-store"});
+    if(response.ok){const data=await response.json();setSavedLooks(data.looks||[]);}
+  },[account.configured,account.user]);
+  useEffect(()=>{queueMicrotask(()=>{void loadSavedLooks();});},[loadSavedLooks]);
   useEffect(()=>{
     let cancelled=false;
     void listRoutinePosts().then(posts=>{
@@ -216,7 +236,7 @@ export default function App() {
   }, []);
   useEffect(() => () => { if (prepPhoto) URL.revokeObjectURL(prepPhoto); }, [prepPhoto]);
   useEffect(() => () => { if (tutorialVideoUrl) URL.revokeObjectURL(tutorialVideoUrl); }, [tutorialVideoUrl]);
-  const nav = <>{!immersiveLesson&&<header className="nav-shell app-nav-shell"><nav className="nav app-nav"><Logo home={() => go("home")} />{profileComplete&&view!=="onboarding"?<button className="account-chip" onClick={()=>go("profile")}><span>{firstName.charAt(0).toUpperCase()}</span><b>{firstName}</b></button>:<span className="local-profile-note">Private profile · this device</span>}</nav></header>}{!immersiveLesson&&profileComplete&&view!=="onboarding"&&<nav className="bottom-nav" aria-label="Primary navigation">
+  const nav = <>{!immersiveLesson&&<header className="nav-shell app-nav-shell"><nav className="nav app-nav"><Logo home={() => go("home")} />{profileComplete&&view!=="onboarding"?<button className="account-chip" onClick={()=>go("profile")}><span>{firstName.charAt(0).toUpperCase()}</span><b>{firstName}</b></button>:<span className="local-profile-note">{account.configured?"Private account":"Local development profile"}</span>}</nav></header>}{!immersiveLesson&&profileComplete&&view!=="onboarding"&&<nav className="bottom-nav" aria-label="Primary navigation">
     <button className={homeFlowActive?"active":""} onClick={()=>go("home")}><i>⌂</i><span>Home</span></button>
     <button className={view==="discover"?"active":""} onClick={()=>go("discover")}><i>◇</i><span>Discover</span></button>
     <button className={`create-tab${createFlowActive?" active":""}`} onClick={()=>go("creator")}><i>＋</i><span>Create</span></button>
@@ -263,8 +283,34 @@ export default function App() {
     setPreviewStatus("generating"); setPreviewError("");
     const form = new FormData(); form.append("face",prepFile); form.append("description",`${brief.title}. ${brief.summary}. ${lookNotes}`); form.append("intensity",previewIntensity);
     if (lookReferenceFrame) form.append("reference", await (await fetch(lookReferenceFrame)).blob(), "tutorial-finish.jpg");
-    try { const response = await fetch("/api/preview-look",{method:"POST",body:form}); const data = await response.json(); if(!response.ok) throw new Error(data.error); setPreviewImage(data.image); setPreviewStatus("ready"); }
+    try { const response = await fetch("/api/preview-look",{method:"POST",headers:{"x-usage-key":crypto.randomUUID()},body:form}); const data = await response.json(); if(!response.ok) throw new Error(data.error); setPreviewImage(data.image); setPreviewStatus("ready");if(account.configured)await account.refresh(); }
     catch(error) { setPreviewError(error instanceof Error?error.message:"Preview generation failed."); setPreviewStatus("error"); }
+  };
+
+  const saveCurrentLook = async () => {
+    if(!brief)return;
+    if(!account.configured){setSaveSessionPhotos(true);setSaveStatus("saved");return;}
+    setSaveStatus("saving");setSaveError("");
+    try{
+      const response=await fetch("/api/saved-looks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:brief.title,tutorialSource:brief.sourceUrl||null,brief,previewImage:previewImage||null})});
+      const data=await response.json();if(!response.ok)throw new Error(data.error);
+      setSaveSessionPhotos(true);setSaveStatus("saved");await loadSavedLooks();
+    }catch(error){setSaveStatus("error");setSaveError(error instanceof Error?error.message:"The look could not be saved.");}
+  };
+  const openSavedLook=(look:SavedLookRecord)=>{
+    const restored=look.brief as unknown as LookBrief;
+    if(!Array.isArray(restored.steps)||!restored.steps.length)return;
+    setBrief(restored);setPreviewImage(look.preview_url||"");setSaveSessionPhotos(true);setSaveStatus("saved");setPrepPhoto("");setPrepFile(null);setMapStatus("idle");go("face-scan");
+  };
+  const deleteSavedLook=async(id:string)=>{
+    const response=await fetch(`/api/saved-looks?id=${encodeURIComponent(id)}`,{method:"DELETE"});
+    if(response.ok)setSavedLooks(current=>current.filter(item=>item.id!==id));
+  };
+  const deleteAccount=async()=>{
+    if(!window.confirm("Delete your Makeup Bestie account, saved looks, profile, and subscription? This cannot be undone."))return;
+    const response=await fetch("/api/account",{method:"DELETE"});const data=await response.json().catch(()=>({}));
+    if(!response.ok){window.alert(data.error||"Your account could not be deleted.");return;}
+    await account.signOut();
   };
 
   const createBrief = async () => {
@@ -273,6 +319,7 @@ export default function App() {
     if(!sourceUrl&&!lookFile){setLessonError("Paste a public tutorial link or upload a permitted video copy.");return;}
     setLessonAnalyzing(true); setLessonError(""); setLessonStage(lookFile?"Reading the uploaded tutorial on your device…":"Checking whether this public tutorial link exposes video…");
     try {
+      if(account.configured)await account.saveProfile({display_name:profileName,skin_type:answers.skin||"",skin_tone:answers.tone||"",experience:answers.level||"",makeup_goal:answers.goal||"",products:ownedProducts,face_shape:shape});
       let tutorial;
       if(lookFile) tutorial=await extractTutorialFrames(lookFile,14);
       else {
@@ -286,7 +333,7 @@ export default function App() {
       setLessonStage(`Uploading ${tutorial.frames.length} timeline samples for visual analysis…`);
       setLookReferenceFrame(tutorial.frames.at(-1) || "");
       const context = JSON.stringify({ skin:answers.skin || "not provided", tone:answers.tone || "not provided", experience:answers.level || "not provided", goal:answers.goal || "not provided", faceShapeEstimate:shape || "pending and adjustable", availableProducts:ownedProducts, lessonStyle:"One chronological product-by-product lesson. Each product step may cover several precise face areas on the user's own face." });
-      const response = await fetch("/api/import-look", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ frames:tutorial.frames, sampleTimes:tutorial.sampleTimes, duration:tutorial.duration, description:lookNotes, context }), signal:AbortSignal.timeout(75_000) });
+      const response = await fetch("/api/import-look", { method:"POST", headers:{ "Content-Type":"application/json","x-usage-key":crypto.randomUUID() }, body:JSON.stringify({ frames:tutorial.frames, sampleTimes:tutorial.sampleTimes, duration:tutorial.duration, description:lookNotes, context }), signal:AbortSignal.timeout(75_000) });
       const raw = await response.text();
       let data: Record<string, unknown>;
       try { data = JSON.parse(raw); }
@@ -295,10 +342,17 @@ export default function App() {
       setLessonStage("Turning the analyzed sequence into your personalized steps…");
       const guide = data as Omit<LookBrief,"time"> & { estimatedMinutes:number };
       setBrief({ ...guide, time:`${guide.estimatedMinutes} min`, sourceUrl:sourceUrl||undefined, sourceVideoAnalyzed:true });
+      setSaveSessionPhotos(false);setSaveStatus("idle");
+      if(account.configured)await account.refresh();
       setSelectedFeature(null);setMirrorOpen(false);setStep(0);go("face-scan");
     } catch (error) { setLessonError(error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError") ? "Tutorial analysis took too long. Please retry once; if it repeats, use a shorter tutorial." : error instanceof Error ? error.message : "The personalized lesson could not be created."); }
     finally { setLessonAnalyzing(false); setLessonStage(""); }
   };
+
+  const subscriptionActive = Boolean(account.snapshot?.subscription && ["active","trialing"].includes(account.snapshot.subscription.status));
+  if(account.configured&&account.snapshot?.profile&&profileComplete&&!subscriptionActive){
+    return <PricingScreen account={account.snapshot} onRefresh={account.refresh} onSignOut={account.signOut}/>;
+  }
 
   if (view === "face-scan") return <>
     {nav}
@@ -333,7 +387,7 @@ export default function App() {
             </div>}
             {shape&&<label className="shape-correction"><span>Correct the estimate</span><select value={shape} onChange={event=>setShape(event.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(item=><option key={item}>{item}</option>)}</select></label>}
             <div className="scan-privacy"><b>Private by default</b><span>Landmark coordinates stay in this browser. The photo is sent only later if you separately request an AI makeup preview.</span></div>
-            <button className="primary wide" disabled={mapStatus!=="ready"} onClick={()=>go("preview")}>See this look on me →</button>
+            <button className="primary wide" disabled={mapStatus!=="ready"} onClick={()=>{if(account.configured)void account.saveProfile({display_name:profileName,skin_type:answers.skin||"",skin_tone:answers.tone||"",experience:answers.level||"",makeup_goal:answers.goal||"",products:ownedProducts,face_shape:shape});go("preview");}}>See this look on me →</button>
           </aside>
         </div>
       </section>
@@ -483,10 +537,11 @@ export default function App() {
               </ul>
             </div>
             <div className="part-by-part-ready"><small>YOUR LESSON FORMAT</small><b>Part by part</b><span>Tap eyes, cheeks, lips, or another available area and follow only the relevant tutorial steps.</span></div>
-            <label className="save-photo-option">
-              <input type="checkbox" checked={saveSessionPhotos} onChange={e => setSaveSessionPhotos(e.target.checked)}/>
-              <span><b>Save this look</b><small>Off by default. Your face photo is not added to My Looks unless you choose this.</small></span>
-            </label>
+            <div className="save-photo-option save-look-control">
+              <span><b>{saveStatus==="saved"?"Saved to My Looks":"Save this look"}</b><small>The lesson and generated preview are private. Your bare-face scan is never stored.</small></span>
+              <button className="outline" disabled={saveStatus==="saving"||saveStatus==="saved"} onClick={saveCurrentLook}>{saveStatus==="saving"?"Saving…":saveStatus==="saved"?"Saved ✓":"Save"}</button>
+            </div>
+            {saveError&&<p className="error">{saveError}</p>}
             <button className="primary wide" disabled={!prepPhoto} onClick={() => {setStep(0);setSelectedFeature(null);setMirrorOpen(false);go("session");}}>Choose a face area →</button>
           </aside>
         </div>
@@ -496,10 +551,10 @@ export default function App() {
 
   if (view === "onboarding") {
     const qs = [["skin","First, your canvas","How does your skin usually feel?",["Dry or tight","Oily or shiny","A little of both","Balanced","Sensitive"]],["tone","Your complexion","Which range feels closest to you?",["Fair","Light","Medium","Tan","Deep","Rich"]],["level","Your experience","Where are you in your makeup journey?",["Just starting","I know the basics","Confident","Basically an artist"]],["goal","Your moment","What do you want to learn first?",["Everyday natural","Soft glam","Full glam","Editorial color","Copy a saved look"]]] as const;
-    if(onboard===0)return <>{nav}<main className="onboarding account-onboarding page-enter"><div className="progress"><span style={{width:"20%"}}/></div><section className="question-card account-card"><p className="eyebrow">Welcome to Makeup Bestie</p><h1>Create your beauty profile.</h1><p className="subcopy">This prototype keeps your profile on this device. Cloud accounts and cross-device sign-in are not connected yet.</p><div className="account-fields"><label><span>Your name</span><input value={profileName} onChange={event=>setProfileName(event.target.value)} autoComplete="name" placeholder="What should your bestie call you?"/></label><label><span>Email</span><input type="email" value={profileEmail} onChange={event=>setProfileEmail(event.target.value)} autoComplete="email" placeholder="you@example.com"/></label></div><button className="primary wide" disabled={!profileName.trim()||!/^\S+@\S+\.\S+$/.test(profileEmail)} onClick={()=>setOnboard(1)}>Personalize my profile →</button></section></main></>;
+    if(onboard===0)return <>{nav}<main className="onboarding account-onboarding page-enter"><div className="progress"><span style={{width:"20%"}}/></div><section className="question-card account-card"><p className="eyebrow">Welcome to Makeup Bestie</p><h1>Create your beauty profile.</h1><p className="subcopy">Your answers make every tutorial specific to your skin, products, experience, and goals. {account.configured?"They sync privately with your account.":"In local development, they stay in this browser."}</p><div className="account-fields"><label><span>Your name</span><input value={profileName} onChange={event=>setProfileName(event.target.value)} autoComplete="name" placeholder="What should your bestie call you?"/></label><label><span>Email</span><input type="email" value={profileEmail} disabled={account.configured} onChange={event=>setProfileEmail(event.target.value)} autoComplete="email" placeholder="you@example.com"/></label></div><button className="primary wide" disabled={!profileName.trim()||!/^\S+@\S+\.\S+$/.test(profileEmail)} onClick={()=>setOnboard(1)}>Personalize my profile →</button></section></main></>;
     const q=qs[onboard-1];
-    const finishProfile=()=>{const nextAnswers={...answers};window.localStorage.setItem("makeup-bestie-profile-v1",JSON.stringify({name:profileName.trim(),email:profileEmail.trim(),answers:nextAnswers}));setView("home");window.scrollTo(0,0);};
-    return <>{nav}<main className="onboarding page-enter"><div className="progress"><span style={{width:`${(onboard+1)*20}%`}} /></div><button className="back" onClick={() => setOnboard(onboard-1)}>← Back</button><section className="question-card"><p className="eyebrow">{q[1]}</p><h1>{q[2]}</h1><p className="subcopy">This personalizes technique—not your beauty.</p><div className="choice-grid">{q[3].map(o => <button key={o} className={answers[q[0]]===o?"selected":""} onClick={() => setAnswers({...answers,[q[0]]:o})}>{o}<b>{answers[q[0]]===o?"✓":"○"}</b></button>)}</div><button className="primary wide" disabled={!answers[q[0]]} onClick={() => onboard===4?finishProfile():setOnboard(onboard+1)}>{onboard===4?"Open Makeup Bestie":"Continue"} →</button></section></main></>;
+    const finishProfile=async()=>{const nextAnswers={...answers};if(account.configured)await account.saveProfile({display_name:profileName.trim(),skin_type:nextAnswers.skin||"",skin_tone:nextAnswers.tone||"",experience:nextAnswers.level||"",makeup_goal:nextAnswers.goal||"",products:ownedProducts,face_shape:shape});else window.localStorage.setItem("makeup-bestie-profile-v1",JSON.stringify({name:profileName.trim(),email:profileEmail.trim(),answers:nextAnswers}));setView("home");window.scrollTo(0,0);};
+    return <>{nav}<main className="onboarding page-enter"><div className="progress"><span style={{width:`${(onboard+1)*20}%`}} /></div><button className="back" onClick={() => setOnboard(onboard-1)}>← Back</button><section className="question-card"><p className="eyebrow">{q[1]}</p><h1>{q[2]}</h1><p className="subcopy">This personalizes technique—not your beauty.</p><div className="choice-grid">{q[3].map(o => <button key={o} className={answers[q[0]]===o?"selected":""} onClick={() => setAnswers({...answers,[q[0]]:o})}>{o}<b>{answers[q[0]]===o?"✓":"○"}</b></button>)}</div><button className="primary wide" disabled={!answers[q[0]]} onClick={() => onboard===4?void finishProfile():setOnboard(onboard+1)}>{onboard===4?"Open Makeup Bestie":"Continue"} →</button></section></main></>;
   }
 
   if(view==="creator")return <>{nav}<CreatorStudio creator={profileName} products={productOptions} onCancel={()=>go("home")} onPublish={publishRoutine}/></>;
@@ -581,26 +636,35 @@ export default function App() {
 
   if(view==="discover")return <>{nav}<DiscoverFeed posts={routinePosts} loading={routineLoading} onTry={tryRoutine} onCreate={()=>go("creator")}/></>;
 
-  if(view==="my-looks")return <>{nav}<main className="app-screen looks-screen page-enter"><header className="screen-heading"><div><p className="eyebrow">My Looks</p><h1>Your beauty shelf.</h1></div><p>Current lessons and intentionally saved looks live here. Nothing is presented as purchased until marketplace payments exist.</p></header>{brief?<article className="saved-look-card">{previewImage||prepPhoto?<img src={previewImage||prepPhoto} alt={previewImage?"Your personalized finished target":"Your current lesson face photo"}/>:<div className="saved-look-placeholder">✦</div>}<div><small>{saveSessionPhotos?"SAVED LOOK":"CURRENT SESSION · NOT SAVED"}</small><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} tutorial steps</p><div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Review look</button><button className="primary" disabled={mapStatus!=="ready"} onClick={()=>go("session")}>Continue lesson →</button></div></div></article>:<section className="looks-empty"><span>♡</span><h2>Your first look starts with a tutorial.</h2><p>Paste a link or upload a permitted video, then Makeup Bestie will turn it into a personalized lesson.</p><button className="primary" onClick={()=>go("studio-intake")}>Create my first look →</button></section>}</main></>;
+  if(view==="my-looks")return <>{nav}<main className="app-screen looks-screen page-enter"><header className="screen-heading"><div><p className="eyebrow">My Looks</p><h1>Your beauty shelf.</h1></div><p>Only looks you deliberately save sync to your private account. Bare-face scans are never stored.</p></header><div className="cloud-look-grid">{brief&&!saveSessionPhotos&&<article className="saved-look-card current-look">{previewImage||prepPhoto?<img src={previewImage||prepPhoto} alt="Your current personalized look"/>:<div className="saved-look-placeholder">✦</div>}<div><small>CURRENT SESSION · NOT SAVED</small><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} tutorial steps</p><div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Review look</button><button className="primary" onClick={saveCurrentLook}>Save look</button></div></div></article>}{savedLooks.map(look=><article className="saved-look-card" key={look.id}>{look.preview_url?<img src={look.preview_url} alt={`${look.title} personalized preview`}/>:<div className="saved-look-placeholder">✦</div>}<div><small>SAVED PRIVATELY</small><h2>{look.title}</h2><p>{new Date(look.created_at).toLocaleDateString()} · Personalized lesson</p><div><button className="primary" onClick={()=>openSavedLook(look)}>Open look →</button><button className="text-button danger" onClick={()=>void deleteSavedLook(look.id)}>Delete</button></div></div></article>)}</div>{!brief&&!savedLooks.length&&<section className="looks-empty"><span>♡</span><h2>Your first look starts with a tutorial.</h2><p>Paste a link or upload a permitted video, then Makeup Bestie will turn it into a personalized lesson.</p><button className="primary" onClick={()=>go("studio-intake")}>Create my first look →</button></section>}</main></>;
 
   if (view === "profile") {
-    // Every number here is read from real local state rather than invented.
-    const savedLooks = brief && saveSessionPhotos ? 1 : 0;
+    const savedLookCount = account.configured?savedLooks.length:(brief&&saveSessionPhotos?1:0);
     return <>{nav}<main className="profile app-screen page-enter">
       <section className="profile-top">
         <div className="avatar large">{firstName.charAt(0).toUpperCase()}</div>
-        <div><p className="eyebrow">Your on-device profile</p><h1>{profileName}</h1><p>{profileEmail} · {answers.skin||"Skin not set"} · {answers.goal||"Goal not set"}</p></div>
+        <div><p className="eyebrow">Your private beauty profile</p><h1>{profileName}</h1><p>{profileEmail} · {answers.skin||"Skin not set"} · {answers.goal||"Goal not set"}</p></div>
         <button className="outline" onClick={()=>{setOnboard(0);setView("onboarding");window.scrollTo(0,0);}}>Edit profile</button>
       </section>
       <div className="stat-row">
-        <div><b>{savedLooks}</b><span>Saved looks</span></div>
-        <div><b>{mapStatus==="ready"?"Local":"Not yet"}</b><span>Face mapping</span></div>
-        <div><b>{routinePosts.length}</b><span>Routine posts</span></div>
+        <div><b>{savedLookCount}</b><span>Saved looks</span></div>
+        <div><b>{account.snapshot?.subscription?.plan==="unlimited"?"Unlimited":account.snapshot?.usage.tutorialAnalyses??0}</b><span>{account.snapshot?.subscription?.plan==="unlimited"?"Current plan":"Lessons used this month"}</span></div>
+        <div><b>{shape||"Not yet"}</b><span>Face estimate</span></div>
       </div>
       <section className="profile-details"><div><small>SKIN</small><b>{answers.skin}</b></div><div><small>COMPLEXION</small><b>{answers.tone}</b></div><div><small>EXPERIENCE</small><b>{answers.level}</b></div><div><small>MAKEUP GOAL</small><b>{answers.goal}</b></div></section>
-      <p className="profile-note">Your beauty-profile answers are stored only in this browser for this prototype. Face photos and tutorial media are not added to the profile. Cloud accounts and cross-device sync still require an authentication and database phase.</p>
+      <section className="account-management"><div><small>SUBSCRIPTION</small><b>{account.snapshot?.subscription?.plan==="unlimited"?"Makeup Bestie Unlimited":"Makeup Bestie Plus"}</b><p>{account.snapshot?.subscription?.cancel_at_period_end?"Cancels at the end of the current billing period.":"Active · manage or cancel securely through Stripe."}</p></div>{account.configured&&<ManageBillingButton/>}</section>
+      <p className="profile-note">Your beauty preferences and deliberately saved looks sync privately to your account. Landmark coordinates and Glam Room camera footage remain on your device. Bare-face scans are not stored.</p>
+      {account.configured&&<><div className="profile-legal-links"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div><div className="profile-account-actions"><button className="text-button" onClick={()=>void account.signOut()}>Sign out</button><button className="text-button danger" onClick={()=>void deleteAccount()}>Delete account and data</button></div></>}
     </main></>;
   }
 
   return <>{nav}<main className="app-dashboard app-screen page-enter"><header className="dashboard-greeting"><p>{greeting}, {firstName}.</p><h1>What routine do you<br/>have in mind?</h1><span>Bring the tutorial first. We’ll study it before asking for today’s face photo.</span></header><section className="routine-composer"><div className="composer-heading"><span>＋</span><div><small>CREATE A PERSONALIZED LESSON</small><h2>Drop the routine here.</h2></div></div><label className="dashboard-link"><span>↗</span><input type="url" inputMode="url" value={lookUrl} onChange={event=>{setLookUrl(event.target.value);setLessonError("");}} placeholder="Paste a TikTok, Instagram, YouTube, or public video link"/></label><div className="composer-divider"><span>or</span></div><label className="dashboard-upload"><span>▶</span><div><b>{lookFile?lookFile.name:"Upload the tutorial video"}</b><small>MP4, WebM, or MOV · only content you can use</small></div><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event=>{const file=event.target.files?.[0]||null;setLookFile(file);setTutorialVideoUrl(file?URL.createObjectURL(file):"");setLessonError("");}}/></label><button className="primary composer-continue" disabled={!lookUrl.trim()&&!lookFile} onClick={()=>go("studio-intake")}>Continue with this routine →</button></section>{brief&&<section className="continue-card"><div><small>CONTINUE WHERE YOU LEFT OFF</small><h2>{brief.title}</h2><p>{mapStatus==="ready"?"Your personalized preview and feature lesson are ready.":"Tutorial analyzed · today’s face photo is next."}</p></div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Continue →</button></section>}<section className="dashboard-steps"><article><span>01</span><b>We study the tutorial</b><p>Real frames, product order, and technique.</p></article><article><span>02</span><b>You take today’s photo</b><p>Local face mapping adapts the routine.</p></article><article><span>03</span><b>You enter the Glam Room</b><p>Feature-by-feature guidance on a large live mirror.</p></article></section></main></>;
+}
+
+export default function App() {
+  const account=useLaunchAccount();
+  if(process.env.NODE_ENV==="production"&&!account.configured)return <CloudConfigurationScreen/>;
+  if(account.loading)return <CloudLoadingScreen/>;
+  if(account.configured&&!account.user)return <AuthScreen/>;
+  return <MakeupBestieExperience account={account}/>;
 }
