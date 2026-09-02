@@ -6,6 +6,7 @@ import Link from "next/link";
 import { estimateFaceProfile, placementFor, type FaceProfile, type FaceShape, type Point } from "@/lib/face-analysis";
 import { type LessonRegion, type Technique } from "@/lib/placement-map";
 import { PlacementGuide } from "./placement-guide";
+import { LiveCoach } from "./live-coach";
 import { extractTutorialFrames, extractTutorialFramesFromUrl } from "@/lib/video-frames";
 import { CreatorStudio, DiscoverFeed, type RoutinePost } from "./routine-community";
 import { listRoutinePosts, saveRoutinePost, type StoredRoutinePost } from "@/lib/routine-posts";
@@ -68,13 +69,23 @@ function FaceFeaturePicker({ photo }: { photo:string }) {
 type MirrorStatus="starting"|"active"|"no-face"|"poor-light"|"denied"|"error";
 type VideoLandmarker={detectForVideo:(video:HTMLVideoElement,time:number)=>{faceLandmarks:Point[][]};close:()=>void};
 function SilentMirror({ areas, technique, shape, stepNumber, paused, facingMode }: { areas:LessonRegion[]; technique:Technique; shape:FaceShape|null; stepNumber:number; paused:boolean; facingMode:"user"|"environment" }) {
+  const stage=useRef<HTMLDivElement>(null);
   const camera=useRef<HTMLVideoElement>(null);
   const [status,setStatus]=useState<MirrorStatus>("starting");
   const [livePoints,setLivePoints]=useState<Point[]>([]);
   // The chart is drawn in the camera's own aspect ratio, so zones sit on the
   // face rather than on a cropped guess at where the face might be.
   const [feedAspect,setFeedAspect]=useState(1);
+  const [displayAspect,setDisplayAspect]=useState(9/16);
   const [retry,setRetry]=useState(0);
+  useEffect(()=>{
+    const element=stage.current;
+    if(!element)return;
+    const measure=()=>{const bounds=element.getBoundingClientRect();if(bounds.width&&bounds.height)setDisplayAspect(bounds.width/bounds.height);};
+    measure();
+    const observer=new ResizeObserver(measure);observer.observe(element);
+    return()=>observer.disconnect();
+  },[]);
   useEffect(()=>{
     const videoElement=camera.current;
     let disposed=false;
@@ -119,10 +130,10 @@ function SilentMirror({ areas, technique, shape, stepNumber, paused, facingMode 
     return()=>{disposed=true;cancelAnimationFrame(raf);landmarker?.close();media?.getTracks().forEach(track=>track.stop());if(videoElement)videoElement.srcObject=null;};
   },[facingMode,retry]);
   const copy:Record<MirrorStatus,string>={starting:"Starting your private mirror…",active:"Private mirror active · landmarks stay on this device","no-face":"No face detected. Center the selected feature in view.","poor-light":"Lighting is too low for stable placement. Face a soft light.",denied:"Camera permission was denied.",error:"The private mirror could not start on this device."};
-  return <div className={`silent-mirror${facingMode==="user"?" front-camera":""}`} style={{aspectRatio:"9 / 16"}}>
+  return <div ref={stage} className={`silent-mirror${facingMode==="user"?" front-camera":""}`} style={{aspectRatio:"9 / 16"}}>
     <video ref={camera} className={facingMode==="user"?"mirrored":""} autoPlay muted playsInline/>
     {livePoints.length>0&&(
-      <PlacementGuide id="mirror" mirrored={facingMode==="user"} focused points={livePoints} areas={areas} technique={technique} shape={shape} aspect={feedAspect} displayAspect={9/16} stepNumber={stepNumber} paused={paused}/>
+      <PlacementGuide id="mirror" mirrored={facingMode==="user"} focused points={livePoints} areas={areas} technique={technique} shape={shape} aspect={feedAspect} displayAspect={displayAspect} stepNumber={stepNumber} paused={paused}/>
     )}
     <div className={`mirror-status ${status}`}><i/><span>{copy[status]}</span></div>
     {(status==="denied"||status==="error")&&<button className="mirror-retry" onClick={()=>setRetry(value=>value+1)}>Retry camera</button>}
@@ -189,6 +200,11 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const createFlowActive=view==="creator";
   const homeFlowActive=["home","studio-intake","face-scan","look-brief","preview","session"].includes(view);
   const immersiveLesson=view==="session"&&Boolean(selectedFeature);
+
+  useEffect(()=>{
+    document.body.classList.toggle("glam-room-open",immersiveLesson);
+    return()=>document.body.classList.remove("glam-room-open");
+  },[immersiveLesson]);
 
   const go = (v: View) => {
     let next=v;
@@ -572,7 +588,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       const target = Math.max(0,Math.min(activeLesson.length-1,nextStep));
       setStep(target);
     };
-    const chooseFeature=(feature:FeatureKey)=>{setSelectedFeature(feature);setMirrorOpen(true);setCameraFacing("user");setGuideExpanded(false);setLessonPanelOpen(true);setTutorialClipOpen(false);setStep(0);};
+    const chooseFeature=(feature:FeatureKey)=>{setSelectedFeature(feature);setMirrorOpen(true);setCameraFacing("user");setGuideExpanded(false);setLessonPanelOpen(false);setTutorialClipOpen(false);setStep(0);};
     const choosingFeature=!selectedFeature;
     const focusedFeature=Boolean(selectedFeature);
     const visibleAreas=(item:LessonStep)=>focusedFeature&&selectedFeature?stepAreasForFeature(item,selectedFeature):stepAreas(item);
@@ -587,8 +603,8 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       {nav}
       <main className={`glam-room page-enter${choosingFeature?" choosing-feature":" lesson-active"}`}>
         <div className="glam-heading">
-          <div><p className="eyebrow">The Glam Room · Part-by-part lesson</p><h1>{brief?.title || "Your personalized lesson"}</h1><p>{choosingFeature?"Choose one available area on your face to begin.":mirrorOpen?"Your silent live mirror is open. Follow the animated placement preview in the corner.":"Your camera is paused. The personalized placement guide is still available."}</p></div>
-          <div className={`offline-pill${mirrorOpen?" active":""}`}><i/> {mirrorOpen?"Private mirror active":choosingFeature?"Camera starts after your choice":"Camera paused"}</div>
+          <div><p className="eyebrow">The Glam Room · Part-by-part lesson</p><h1>{brief?.title || "Your personalized lesson"}</h1><p>{choosingFeature?"Choose one available area on your face to begin.":mirrorOpen?"Your live mirror is open. Follow the animated placement preview and turn on the coach whenever you want to talk.":"Your camera is paused. The personalized placement guide is still available."}</p></div>
+          <div className={`offline-pill${mirrorOpen?" active":""}`}><i/> {mirrorOpen?"Private camera active":choosingFeature?"Camera starts after your choice":"Camera paused"}</div>
         </div>
         <div className="glam-grid">
           <section className="glam-face-card">
@@ -598,6 +614,18 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
                 <div className="animated-guide-title"><span>YOUR ANIMATED GUIDE</span><b>{currentLesson.product}</b></div>
                 {personalizedGuide(true)}
               </div>
+              <LiveCoach context={{
+                lookTitle:brief?.title||"Your personalized look",
+                feature:selectedFeature?featureLabels[selectedFeature]:"Selected feature",
+                product:currentLesson.product,
+                instruction:currentLesson.instruction,
+                adaptation:[currentLesson.adaptation,personalizedPlacement!==currentLesson.adaptation?personalizedPlacement:""].filter(Boolean).join(" "),
+                checkpoint:currentLesson.checkpoint,
+                faceShape:shape||"Not estimated",
+                skinType:answers.skin||"Not supplied",
+                skinTone:answers.tone||"Not supplied",
+                experience:answers.level||"Not supplied",
+              }}/>
               <div className="mirror-toolbar" aria-label="Mirror controls">
                 <button onClick={()=>{setSelectedFeature(null);setMirrorOpen(false);setGuideExpanded(false);setStep(0);}}><span>⌁</span>Change area</button>
                 <button aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}><span>{guideMotion?"Ⅱ":"▶"}</span>{guideMotion?"Pause arrows":"Play arrows"}</button>
@@ -607,10 +635,10 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
                 <button className="stop-camera" onClick={()=>setMirrorOpen(false)}><span>■</span>Stop camera</button>
               </div>
             </div>:personalizedGuide()}
-            {!choosingFeature&&<div className="glam-face-caption"><span>{mirrorOpen?"Silent live mirror · on-device tracking":"Camera paused · scanned-face guide"}</span><b>{areaSummary(currentLesson)}</b></div>}
+            {!choosingFeature&&<div className="glam-face-caption"><span>{mirrorOpen?"Live mirror · on-device tracking":"Camera paused · scanned-face guide"}</span><b>{areaSummary(currentLesson)}</b></div>}
           </section>
           <aside className={`glam-lesson-card${lessonPanelOpen?" panel-open":" panel-closed"}`}>
-            <button className="lesson-panel-handle" aria-expanded={lessonPanelOpen} onClick={()=>setLessonPanelOpen(value=>!value)}><span/><b>{choosingFeature?"Choose a feature":`${selectedFeature?featureLabels[selectedFeature]:"Lesson"} · Step ${step+1}`}</b><small>{lessonPanelOpen?"Hide":"Show"}</small></button>
+            <button className="lesson-panel-handle" aria-expanded={lessonPanelOpen} onClick={()=>setLessonPanelOpen(value=>!value)}><span/><b>{choosingFeature?"Choose a feature":`${currentLesson.product} · Step ${step+1}`}</b><small>{lessonPanelOpen?"Hide":"Details"}</small></button>
             <div className="lesson-panel-content">{choosingFeature?<div className="feature-welcome"><p className="eyebrow">Choose your lesson area</p><h2>Pick one feature.</h2><p>Select from the list below. We’ll gather every tutorial step that affects it and keep the original product order.</p><div className="available-list">{availableFeatures.map((feature,index)=><button key={feature} onClick={()=>chooseFeature(feature)}><small>{String(index+1).padStart(2,"0")}</small><b>{featureLabels[feature]}</b><span>→</span></button>)}</div></div>:<>
               <div className="lesson-progress"><span>{selectedFeature?featureLabels[selectedFeature]:"Choose a feature"}</span><span>Step {step+1} of {activeLesson.length}</span></div>
               <div className="dots">{activeLesson.map((_,index)=><i key={index} className={index<=step?"active":""}/>)}</div>
@@ -624,7 +652,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
               <div className="step-target"><small>THIS STEP IS READY WHEN</small><p>{currentLesson.checkpoint}</p></div>
               {currentLesson.uncertain&&<div className="uncertain-step"><b>Uncertain tutorial detail</b><span>This product, shade, or hidden technique could not be confirmed from the analyzed frames.</span></div>}
               {previewImage&&<div className="finished-mini"><img src={previewImage} alt="Your personalized finished look"/><span><small>YOUR FINISHED TARGET</small><b>{brief?.title}</b></span></div>}
-              {!mirrorOpen&&<div className="mirror-option"><div><b>Silent mirror paused</b><span>Restart it whenever you are ready. Landmarks stay on this device; no frames are uploaded.</span></div><button className="outline" onClick={()=>setMirrorOpen(true)}>Restart silent mirror</button></div>}
+              {!mirrorOpen&&<div className="mirror-option"><div><b>Live mirror paused</b><span>Restart it whenever you are ready. Landmarks stay on this device; no camera frames are uploaded.</span></div><button className="outline" onClick={()=>setMirrorOpen(true)}>Restart live mirror</button></div>}
               <div className="glam-actions">
                 <button className="outline" disabled={step===0} onClick={()=>moveToStep(step-1)}>← Previous</button>
                 {step===activeLesson.length-1?<button className="primary" onClick={()=>{setMirrorOpen(false);go("preview");}}>Finish {selectedFeature?featureLabels[selectedFeature].toLowerCase():"feature"} ✓</button>:<button className="primary" onClick={()=>moveToStep(step+1)}>Done—next product →</button>}

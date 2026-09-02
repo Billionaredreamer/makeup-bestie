@@ -10,8 +10,9 @@ A privacy-first makeup lesson app built with Next.js, MediaPipe Face Landmarker,
 4. The browser samples the real video timeline; OpenAI creates a structured product-by-product lesson only after those frames are reviewed.
 5. Take a current bare-face photo. MediaPipe maps facial landmarks on the device and presents an editable face-shape estimate.
 6. Optionally request a generated finished-look preview, then select eyes, brows, cheeks, nose, complexion, lips, or jaw.
-7. Follow the matching tutorial steps in the portrait Glam Room. The live mirror and landmark-aligned overlays stay on the device.
-8. Deliberately save a lesson and generated preview to the private account, or leave it session-only.
+7. Follow the matching tutorial steps in the portrait Glam Room. On phones, the mirror fills the viewport while the lesson, animated guide, and controls float above it. Landmark-aligned overlays stay on the device.
+8. Optionally start the single-voice live coach for conversational help with the current product and face-specific instruction. Camera video is not sent to the voice coach.
+9. Deliberately save a lesson and generated preview to the private account, or leave it session-only.
 
 Home, Discover, Create, My Looks, and Profile remain in the mobile bottom navigation. Discover and creator publishing are currently on-device previews; shared creator publishing and marketplace payments are intentionally deferred.
 
@@ -29,6 +30,8 @@ The database enforces entitlements in `supabase/migrations/202609010001_launch_a
 - Beauty-profile answers and deliberately saved looks sync to the signed-in user through Supabase Row Level Security.
 - Facial landmark coordinates, Glam Room camera frames, and bare-face scan photos are not persisted.
 - The camera starts only from the Glam Room and can be stopped immediately. Closing the mirror, changing features, or leaving the lesson stops all media tracks.
+- The optional live coach requests microphone permission separately, uses a short-lived OpenAI Realtime client secret, and stops its microphone track when ended or when the Glam Room closes. The permanent OpenAI key never reaches the browser.
+- The voice coach receives the current structured lesson and beauty-profile context. It does not receive the live camera feed and is instructed never to claim it can see the user.
 - A bare-face photo is sent to OpenAI only after explicit preview consent.
 - Saving is optional. A saved look contains the structured lesson and, when available, the generated makeup preview—not the bare-face scan.
 - Uploaded or publicly accessible tutorial videos are sampled in the browser. Selected frames are sent for one tutorial-analysis request and are not stored by the app.
@@ -79,7 +82,7 @@ The migration creates private profiles, subscriptions, saved looks, AI-usage rec
 ### 3. OpenAI and public configuration
 
 - Set `OPENAI_API_KEY` server-side only. Never prefix it with `NEXT_PUBLIC_`.
-- Optional model overrides are `OPENAI_VISION_MODEL` and `OPENAI_IMAGE_MODEL`.
+- Optional model overrides are `OPENAI_VISION_MODEL`, `OPENAI_IMAGE_MODEL`, and `OPENAI_REALTIME_MODEL`.
 - Set `NEXT_PUBLIC_APP_URL` to the exact local or production origin.
 - Set `NEXT_PUBLIC_SUPPORT_EMAIL` to a public customer-support address shown in Terms and Privacy.
 
@@ -92,7 +95,7 @@ npm test
 npm run build
 ```
 
-Manual launch checks should cover signup confirmation, sign-in/reset, both Stripe test checkouts, webhook activation, billing portal cancellation, Plus quota behavior, private saved-look access, account deletion, link-only and upload-only tutorials, camera denial, camera shutdown, and mobile/desktop layouts.
+Manual launch checks should cover signup confirmation, sign-in/reset, both Stripe test checkouts, webhook activation, billing portal cancellation, Plus quota behavior, private saved-look access, account deletion, link-only and upload-only tutorials, camera denial, camera shutdown, microphone denial, coach mute/pause/repeat/end, a single audible coach, and mobile/desktop Glam Room layouts.
 
 ## Vercel deployment
 
@@ -110,6 +113,8 @@ Manual launch checks should cover signup confirmation, sign-in/reset, both Strip
 - `app/placement-guide.tsx`: placement outlines, animated arrows, and step badges.
 - `app/api/import-look`: tutorial-frame analysis, protected by subscriber entitlements.
 - `app/api/preview-look`: consented image preview generation, protected by subscriber entitlements.
+- `app/api/realtime-session`: authenticated creation of short-lived Realtime client secrets; the permanent key remains server-only.
+- `app/live-coach.tsx`: one WebRTC audio connection with mute, pause, repeat, and end controls.
 - `app/api/tutorial-media`: bounded public-media discovery and streaming with redirect/private-network protections.
 - `app/api/account`: persistent beauty profile, usage snapshot, and account deletion.
 - `app/api/saved-looks`: private optional lesson and generated-preview storage.
