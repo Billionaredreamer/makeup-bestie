@@ -178,6 +178,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [saveStatus,setSaveStatus]=useState<"idle"|"saving"|"saved"|"error">("idle");
   const [saveError,setSaveError]=useState("");
   const routineUrls=useRef<string[]>([]);
+  const lastHydratedUserId=useRef<string|null>(null);
   const fullLesson = brief?.steps?.length ? brief.steps : defaultLesson;
   const matchingLesson = selectedFeature ? fullLesson.filter(item=>stepMatchesFeature(item,selectedFeature)) : fullLesson;
   const activeLesson = selectedFeature && matchingLesson.length ? matchingLesson : fullLesson;
@@ -198,11 +199,14 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   };
   useEffect(()=>{
     const cloudProfile=account.snapshot?.profile;
-    if(cloudProfile){queueMicrotask(()=>{setProfileName(cloudProfile.display_name);setProfileEmail(account.snapshot?.user.email||"");setAnswers({skin:cloudProfile.skin_type,tone:cloudProfile.skin_tone,level:cloudProfile.experience,goal:cloudProfile.makeup_goal});setOwnedProducts(cloudProfile.products||[]);if(cloudProfile.face_shape)setShape(cloudProfile.face_shape as FaceShape);setView("home");});return;}
+    const cloudUserId=account.user?.id||null;
+    const shouldChooseInitialView=Boolean(cloudUserId&&lastHydratedUserId.current!==cloudUserId);
+    if(cloudUserId)lastHydratedUserId.current=cloudUserId;
+    if(cloudProfile){queueMicrotask(()=>{setProfileName(cloudProfile.display_name);setProfileEmail(account.snapshot?.user.email||"");setAnswers({skin:cloudProfile.skin_type,tone:cloudProfile.skin_tone,level:cloudProfile.experience,goal:cloudProfile.makeup_goal});setOwnedProducts(cloudProfile.products||[]);if(cloudProfile.face_shape)setShape(cloudProfile.face_shape as FaceShape);if(shouldChooseInitialView)setView("home");});return;}
     if(account.configured&&account.user){
       let localName=String(account.user.user_metadata?.display_name||"");let localAnswers:Record<string,string>={};
       try{const saved=window.localStorage.getItem("makeup-bestie-profile-v1");if(saved){const parsed=JSON.parse(saved) as {name?:string;answers?:Record<string,string>};localName=parsed.name||localName;localAnswers=parsed.answers||{};}}catch{/* Start with a clean cloud profile. */}
-      queueMicrotask(()=>{setProfileName(localName);setProfileEmail(account.user?.email||"");setAnswers(localAnswers);setView("onboarding");});return;
+      queueMicrotask(()=>{setProfileName(localName);setProfileEmail(account.user?.email||"");setAnswers(localAnswers);if(shouldChooseInitialView)setView("onboarding");});return;
     }
     if(!account.configured)try {
       const saved=window.localStorage.getItem("makeup-bestie-profile-v1");
