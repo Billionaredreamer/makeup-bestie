@@ -14,7 +14,7 @@ A privacy-first makeup lesson app built with Next.js, MediaPipe Face Landmarker,
 8. Optionally start the single-voice live coach for conversational help with the current product and face-specific instruction. Camera video is not sent to the voice coach.
 9. Deliberately save a lesson and generated preview to the private account, or leave it session-only.
 
-Home, Discover, Create, My Looks, and Profile remain in the mobile bottom navigation. Discover and creator publishing are currently on-device previews; shared creator publishing and marketplace payments are intentionally deferred.
+Home, Discover, Create, My Looks, and Profile remain in the mobile bottom navigation. Discover and Create are clearly labeled **Coming soon**: creator publishing, shared video hosting, routine sales, and marketplace payments are intentionally deferred until after the core lesson product is validated.
 
 ## Plans and usage protection
 
@@ -60,7 +60,7 @@ Do not put real secrets in source control. `.env*` is ignored by Git. Add values
    - `http://localhost:3000/auth/reset-password`
    - `https://YOUR-PRODUCTION-DOMAIN/auth/callback`
    - `https://YOUR-PRODUCTION-DOMAIN/auth/reset-password`
-5. Configure an SMTP provider and customize confirmation/reset emails before accepting production signups.
+5. Before accepting public signups, open **Authentication → Emails → SMTP settings**, enable custom SMTP, and enter credentials from an email provider such as Resend, Postmark, SendGrid, Brevo, or Amazon SES. Use a verified sender on your domain, such as `hello@makeupbestie.app`, and customize the confirmation/reset templates.
 
 The migration creates private profiles, subscriptions, saved looks, AI-usage records, and a private `look-previews` storage bucket with per-user policies.
 
