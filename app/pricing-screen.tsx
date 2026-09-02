@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import type { AccountSnapshot, SubscriptionPlan } from "@/lib/account-types";
 
+type BillingPayload = { error?: string; url?: string };
+
+async function readBillingPayload(response: Response): Promise<BillingPayload> {
+  const text = await response.text();
+  if (!text) return {};
+  try { return JSON.parse(text) as BillingPayload; }
+  catch { return {}; }
+}
+
 export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnapshot;onRefresh:()=>Promise<void>;onSignOut:()=>Promise<void>}) {
   const [busy,setBusy]=useState<SubscriptionPlan|null>(null);
   const [error,setError]=useState("");
@@ -13,7 +22,7 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
   },[onRefresh]);
   const checkout=async(plan:SubscriptionPlan)=>{
     setBusy(plan);setError("");
-    try{const response=await fetch("/api/billing/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan})});const data=await response.json();if(!response.ok)throw new Error(data.error);window.location.assign(data.url);}
+    try{const response=await fetch("/api/billing/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan})});const data=await readBillingPayload(response);if(!response.ok)throw new Error(data.error||`Secure checkout is unavailable (${response.status}).`);if(!data.url)throw new Error("Secure checkout did not return a destination. Please try again.");window.location.assign(data.url);}
     catch(caught){setError(caught instanceof Error?caught.message:"Checkout could not be opened.");setBusy(null);}
   };
   return <main className="pricing-screen page-enter">
@@ -30,6 +39,6 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
 
 export function ManageBillingButton() {
   const [busy,setBusy]=useState(false);const [error,setError]=useState("");
-  const open=async()=>{setBusy(true);setError("");try{const response=await fetch("/api/billing/portal",{method:"POST"});const data=await response.json();if(!response.ok)throw new Error(data.error);window.location.assign(data.url);}catch(caught){setError(caught instanceof Error?caught.message:"Billing could not be opened.");setBusy(false);}};
+  const open=async()=>{setBusy(true);setError("");try{const response=await fetch("/api/billing/portal",{method:"POST"});const data=await readBillingPayload(response);if(!response.ok)throw new Error(data.error||`Billing is unavailable (${response.status}).`);if(!data.url)throw new Error("Billing did not return a destination. Please try again.");window.location.assign(data.url);}catch(caught){setError(caught instanceof Error?caught.message:"Billing could not be opened.");setBusy(false);}};
   return <span className="billing-action"><button className="outline" disabled={busy} onClick={open}>{busy?"Opening billing…":"Manage subscription"}</button>{error&&<small>{error}</small>}</span>;
 }
