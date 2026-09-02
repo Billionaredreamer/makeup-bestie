@@ -6,8 +6,7 @@ import { getStripe, priceForPlan } from "@/lib/stripe";
 
 function isMissingStripeCustomer(error: unknown) {
   return error instanceof Stripe.errors.StripeInvalidRequestError
-    && error.code === "resource_missing"
-    && error.param === "customer";
+    && error.code === "resource_missing";
 }
 
 export async function POST(request: Request) {
