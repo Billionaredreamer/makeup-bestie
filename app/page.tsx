@@ -31,7 +31,7 @@ import {
 } from "@/lib/face-blueprint";
 
 type View = "home" | "discover" | "creator" | "my-looks" | "onboarding" | "face-scan" | "studio-intake" | "look-brief" | "preview" | "session" | "import" | "profile";
-type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; areas: LessonRegion[]; technique: Technique; referenceCue: string; adaptation: string; checkpoint: string; startTimeSeconds: number; endTimeSeconds: number; uncertain: boolean };
+type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; areas: LessonRegion[]; technique: Technique; referenceCue: string; adaptation: string; checkpoint: string; startTimeSeconds: number; endTimeSeconds: number; uncertain: boolean; addedByBestie?: boolean };
 type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[]; analysisScope: string; steps: LessonStep[]; sourceUrl?: string; sourceVideoAnalyzed?: boolean };
 const defaultLesson: LessonStep[] = [
   { title:"Prep your canvas", instruction:"Press primer into the center, then blend outward.", product:"Primer", region:"all-face", areas:["all-face"], technique:"prep", referenceCue:"Foundation preparation", adaptation:"Use thin, comfortable layers.", checkpoint:"Skin feels comfortable and looks evenly prepped without visible buildup.", startTimeSeconds:0, endTimeSeconds:8, uncertain:false },
@@ -46,13 +46,6 @@ const productOptions = ["Primer", "Foundation or skin tint", "Concealer", "Conto
 const areaLabels: Record<LessonRegion, string> = { "all-face":"full face", complexion:"complexion", forehead:"forehead", "both-cheeks":"both cheeks", "left-cheek":"left cheek", "right-cheek":"right cheek", "both-eyes":"both eyes", "left-eye":"left eye", "right-eye":"right eye", brows:"brows", nose:"nose", lips:"lips", jaw:"jaw and chin", none:"finish" };
 const stepAreas = (item: LessonStep) => [...new Set(item.areas?.length ? item.areas : [item.region])];
 const areaSummary = (item: LessonStep) => stepAreas(item).map(area => areaLabels[area]).join(" · ");
-type FeatureKey = "complexion" | "cheeks" | "eyes" | "brows" | "nose" | "lips" | "jaw";
-const featureLabels: Record<FeatureKey,string> = { complexion:"Complexion", cheeks:"Cheeks", eyes:"Eyes", brows:"Brows", nose:"Nose", lips:"Lips", jaw:"Jaw & chin" };
-const featureRegions: Record<FeatureKey,LessonRegion[]> = {
-  complexion:["all-face","complexion","forehead"], cheeks:["both-cheeks","left-cheek","right-cheek"], eyes:["both-eyes","left-eye","right-eye"], brows:["brows"], nose:["nose"], lips:["lips"], jaw:["jaw"],
-};
-const stepMatchesFeature = (item:LessonStep, feature:FeatureKey) => stepAreas(item).some(area=>featureRegions[feature].includes(area));
-const stepAreasForFeature = (item:LessonStep, feature:FeatureKey) => stepAreas(item).filter(area=>featureRegions[feature].includes(area));
 
 const normalizeTutorialUrl = (value: string) => {
   try {
@@ -76,10 +69,6 @@ function TutorialClip({ src, start, end, product }: { src:string; start:number; 
     <div><span><b>FROM YOUR TUTORIAL</b><small>{Math.floor(safeStart/60)}:{String(Math.floor(safeStart%60)).padStart(2,"0")}–{Math.floor(safeEnd/60)}:{String(Math.floor(safeEnd%60)).padStart(2,"0")}</small></span><button onClick={replay}>↻ Replay clip</button></div>
     <video ref={clip} src={src} playsInline muted controls preload="metadata" aria-label={`${product} tutorial segment`} onLoadedMetadata={()=>{if(clip.current)clip.current.currentTime=safeStart;}} onTimeUpdate={()=>{if(clip.current&&clip.current.currentTime>=safeEnd){clip.current.pause();clip.current.currentTime=safeStart;}}}/>
   </div>;
-}
-
-function FaceFeaturePicker({ photo }: { photo:string }) {
-  return <div className="feature-picker"><img src={photo} alt="Your clean scanned face before choosing a lesson area"/></div>;
 }
 
 const titleCase = (value:string) => value.replace(/\b\w/g, character=>character.toUpperCase());
@@ -192,7 +181,6 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [faceBlueprint, setFaceBlueprint] = useState<FaceBlueprint | null>(null);
   const [facePoints, setFacePoints] = useState<Point[]>([]);
   const [photoAspect, setPhotoAspect] = useState(3/4);
-  const [selectedFeature, setSelectedFeature] = useState<FeatureKey|null>(null);
   const [mirrorOpen,setMirrorOpen]=useState(false);
   const [cameraFacing,setCameraFacing]=useState<"user"|"environment">("user");
   const [guideCorner,setGuideCorner]=useState<"left"|"right">("right");
@@ -227,15 +215,14 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [saveError,setSaveError]=useState("");
   const lastHydratedUserId=useRef<string|null>(null);
   const fullLesson = brief?.steps?.length ? brief.steps : defaultLesson;
-  const matchingLesson = selectedFeature ? fullLesson.filter(item=>stepMatchesFeature(item,selectedFeature)) : fullLesson;
-  const activeLesson = selectedFeature && matchingLesson.length ? matchingLesson : fullLesson;
+  const activeLesson = fullLesson;
   const currentLesson = activeLesson[Math.min(step, activeLesson.length - 1)];
   const profileComplete=Boolean(profileName&&answers.skin&&answers.tone&&answers.level&&answers.goal);
   const firstName=profileName.trim().split(/\s+/)[0]||"Bestie";
   const greeting=(()=>{const hour=new Date().getHours();return hour<12?"Good morning":hour<18?"Good afternoon":"Good evening";})();
   const createFlowActive=view==="creator";
   const homeFlowActive=["home","studio-intake","face-scan","look-brief","preview","session"].includes(view);
-  const immersiveLesson=view==="session"&&Boolean(selectedFeature);
+  const immersiveLesson=view==="session";
 
   useEffect(()=>{
     document.body.classList.toggle("glam-room-open",immersiveLesson);
@@ -374,7 +361,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       }
       setLessonStage(`Uploading ${tutorial.frames.length} timeline samples for visual analysis…`);
       setLookReferenceFrame(tutorial.frames.at(-1) || "");
-      const context = JSON.stringify({ skin:answers.skin || "not provided", tone:answers.tone || "not provided", experience:answers.level || "not provided", goal:answers.goal || "not provided", faceShapeEstimate:shape || "pending and adjustable", confirmedFaceBlueprint:faceBlueprintSummary(faceBlueprint), availableProducts:ownedProducts, lessonStyle:"One chronological product-by-product lesson. Each product step may cover several precise face areas on the user's own face." });
+      const context = JSON.stringify({ skin:answers.skin || "not provided", tone:answers.tone || "not provided", experience:answers.level || "not provided", goal:answers.goal || "not provided", faceShapeEstimate:shape || "pending and adjustable", confirmedFaceBlueprint:faceBlueprintSummary(faceBlueprint), availableProducts:ownedProducts, lessonStyle:"One chronological application-by-application lesson. Each product step appears once and may cover several precise face areas on the user's own face." });
       const response = await fetch("/api/import-look", { method:"POST", headers:{ "Content-Type":"application/json","x-usage-key":crypto.randomUUID() }, body:JSON.stringify({ frames:tutorial.frames, sampleTimes:tutorial.sampleTimes, duration:tutorial.duration, description:lookNotes, context }), signal:AbortSignal.timeout(75_000) });
       const raw = await response.text();
       let data: Record<string, unknown>;
@@ -386,7 +373,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       setBrief({ ...guide, time:`${guide.estimatedMinutes} min`, sourceUrl:sourceUrl||undefined, sourceVideoAnalyzed:true });
       setSaveSessionPhotos(false);setSaveStatus("idle");
       if(account.configured)await account.refresh();
-      setSelectedFeature(null);setMirrorOpen(false);setStep(0);go("face-scan");
+      setMirrorOpen(false);setStep(0);go("face-scan");
     } catch (error) { setLessonError(error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError") ? "Tutorial analysis took too long. Please retry once; if it repeats, use a shorter tutorial." : error instanceof Error ? error.message : "The personalized lesson could not be created."); }
     finally { setLessonAnalyzing(false); setLessonStage(""); }
   };
@@ -565,10 +552,10 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
             </button>
           </div>
           <aside className="preview-plan face-first-plan">
-            <p className="eyebrow">Your face-first lesson</p>
-            <h2>One feature at a time.</h2>
-            <p className="face-first-copy">Your analyzed tutorial stays in its original product order. In the Glam Room, choose a feature and see only the tutorial steps that affect that area.</p>
-            <div className="face-first-flow"><span><b>1</b>Analyzed tutorial</span><i>→</i><span><b>2</b>Your features</span><i>→</i><span><b>3</b>Placement guide</span></div>
+            <p className="eyebrow">Your application plan</p>
+            <h2>One product at a time.</h2>
+            <p className="face-first-copy">Your analyzed tutorial becomes one clear application queue. Each product appears once in the order you will use it, with skin preparation placed before the first complexion step.</p>
+            <div className="face-first-flow"><span><b>1</b>Analyzed tutorial</span><i>→</i><span><b>2</b>Product queue</span><i>→</i><span><b>3</b>Live guidance</span></div>
             <div className="product-timeline"><small>YOUR ROUTINE</small>{brief.steps.map((item,index)=><div key={`${item.title}-${index}`}><b>{String(index+1).padStart(2,"0")}</b><span><strong>{item.product}</strong><small>{areaSummary(item)}</small></span></div>)}</div>
             <div className="preview-summary">
               <small>YOUR COACH ALREADY KNOWS</small>
@@ -580,13 +567,13 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
                 <li>{faceBlueprint ? "Face Blueprint confirmed" : "Feature details pending"}</li>
               </ul>
             </div>
-            <div className="part-by-part-ready"><small>YOUR LESSON FORMAT</small><b>Part by part</b><span>Tap eyes, cheeks, lips, or another available area and follow only the relevant tutorial steps.</span></div>
+            <div className="application-queue-ready"><small>YOUR LESSON FORMAT</small><b>Application by application</b><span>Enter the Glam Room once, then use the in-mirror controls to move from product to product without leaving your camera.</span></div>
             <div className="save-photo-option save-look-control">
               <span><b>{saveStatus==="saved"?"Saved to My Looks":"Save this look"}</b><small>The lesson and generated preview are private. Your bare-face scan is never stored.</small></span>
               <button className="outline" disabled={saveStatus==="saving"||saveStatus==="saved"} onClick={saveCurrentLook}>{saveStatus==="saving"?"Saving…":saveStatus==="saved"?"Saved ✓":"Save"}</button>
             </div>
             {saveError&&<p className="error">{saveError}</p>}
-            <button className="primary wide" disabled={!prepPhoto} onClick={() => {setStep(0);setSelectedFeature(null);setMirrorOpen(false);go("session");}}>Choose a face area →</button>
+            <button className="primary wide" disabled={!prepPhoto} onClick={() => {setStep(0);setMirrorOpen(true);setCameraFacing("user");setGuideExpanded(false);setLessonPanelOpen(false);setTutorialClipOpen(false);go("session");}}>Enter the Glam Room →</button>
           </aside>
         </div>
       </section>
@@ -608,40 +595,35 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     const placementKey = currentLesson.technique as keyof ReturnType<typeof placementFor>;
     const personalizedPlacement = placement?.[placementKey] || currentLesson.adaptation;
     const blueprintPlacement = blueprintTechniqueNote(faceBlueprint,currentLesson.technique);
-    const availableFeatures=(Object.keys(featureLabels) as FeatureKey[]).filter(feature=>fullLesson.some(item=>stepMatchesFeature(item,feature)));
     const moveToStep = (nextStep:number) => {
       const target = Math.max(0,Math.min(activeLesson.length-1,nextStep));
-      setStep(target);
+      setStep(target);setTutorialClipOpen(false);
     };
-    const chooseFeature=(feature:FeatureKey)=>{setSelectedFeature(feature);setMirrorOpen(true);setCameraFacing("user");setGuideExpanded(false);setLessonPanelOpen(false);setTutorialClipOpen(false);setStep(0);};
-    const choosingFeature=!selectedFeature;
-    const focusedFeature=Boolean(selectedFeature);
-    const visibleAreas=(item:LessonStep)=>focusedFeature&&selectedFeature?stepAreasForFeature(item,selectedFeature):stepAreas(item);
     const personalizedGuide=(compact=false)=><div className={`glam-face${compact?" compact-guide":""}`} style={{aspectRatio:String(photoAspect)}}>
       <img src={prepPhoto} alt="Your face with a personalized makeup placement guide"/>
-      {activeLesson.slice(0,step).map((item,index)=><PlacementGuide key={`${item.product}-${index}`} id={`complete-${compact?"pip-":""}${index}`} soft focused stepNumber={index+1} points={facePoints} areas={visibleAreas(item)} technique={item.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect}/>)}
-      <PlacementGuide id={compact?"lesson-pip":"lesson"} focused points={facePoints} areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect} stepNumber={step+1} paused={!guideMotion}/>
+      {activeLesson.slice(0,step).map((item,index)=><PlacementGuide key={`${item.product}-${index}`} id={`complete-${compact?"pip-":""}${index}`} soft focused stepNumber={index+1} points={facePoints} areas={stepAreas(item)} technique={item.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect}/>)}
+      <PlacementGuide id={compact?"lesson-pip":"lesson"} focused points={facePoints} areas={stepAreas(currentLesson)} technique={currentLesson.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect} stepNumber={step+1} paused={!guideMotion}/>
       {!compact&&<button className="guide-motion-toggle" aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Ⅱ Pause arrows":"▶ Animate arrows"}</button>}
       {!compact&&<div className="placement-key"><span/><b>{currentLesson.product}</b><small>Outline = where it goes · arrows = which way to blend</small></div>}
     </div>;
     return <>
       {nav}
-      <main className={`glam-room page-enter${choosingFeature?" choosing-feature":" lesson-active"}`}>
+      <main className="glam-room page-enter lesson-active">
         <div className="glam-heading">
-          <div><p className="eyebrow">The Glam Room · Part-by-part lesson</p><h1>{brief?.title || "Your personalized lesson"}</h1><p>{choosingFeature?"Choose one available area on your face to begin.":mirrorOpen?"Your live mirror is open. Follow the animated placement preview and turn on the coach whenever you want to talk.":"Your camera is paused. The personalized placement guide is still available."}</p></div>
-          <div className={`offline-pill${mirrorOpen?" active":""}`}><i/> {mirrorOpen?"Private camera active":choosingFeature?"Camera starts after your choice":"Camera paused"}</div>
+          <div><p className="eyebrow">The Glam Room · Application {step+1} of {activeLesson.length}</p><h1>{brief?.title || "Your personalized lesson"}</h1><p>{mirrorOpen?"Your live mirror is open. Move through the product queue here and turn on the coach whenever you want to talk.":"Your camera is paused. The personalized placement guide and full product queue are still available."}</p></div>
+          <div className={`offline-pill${mirrorOpen?" active":""}`}><i/> {mirrorOpen?"Private camera active":"Camera paused"}</div>
         </div>
         <div className="glam-grid">
           <section className="glam-face-card">
-            {choosingFeature?<FaceFeaturePicker photo={prepPhoto}/>:mirrorOpen?<div className="feature-mirror-stage">
-              <SilentMirror areas={visibleAreas(currentLesson)} technique={currentLesson.technique} shape={shape} blueprint={faceBlueprint} stepNumber={step+1} paused facingMode={cameraFacing}/>
+            {mirrorOpen?<div className="feature-mirror-stage">
+              <SilentMirror areas={stepAreas(currentLesson)} technique={currentLesson.technique} shape={shape} blueprint={faceBlueprint} stepNumber={step+1} paused facingMode={cameraFacing}/>
               <div className={`animated-guide-pip corner-${guideCorner}${guideExpanded?" expanded":""}`}>
                 <div className="animated-guide-title"><span>YOUR ANIMATED GUIDE</span><b>{currentLesson.product}</b></div>
                 {personalizedGuide(true)}
               </div>
               <LiveCoach context={{
                 lookTitle:brief?.title||"Your personalized look",
-                feature:selectedFeature?featureLabels[selectedFeature]:"Selected feature",
+                feature:areaSummary(currentLesson),
                 product:currentLesson.product,
                 instruction:currentLesson.instruction,
                 adaptation:[currentLesson.adaptation,personalizedPlacement!==currentLesson.adaptation?personalizedPlacement:"",blueprintPlacement].filter(Boolean).join(" "),
@@ -652,7 +634,8 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
                 experience:answers.level||"Not supplied",
               }}/>
               <div className="mirror-toolbar" aria-label="Mirror controls">
-                <button onClick={()=>{setSelectedFeature(null);setMirrorOpen(false);setGuideExpanded(false);setStep(0);}}><span>⌁</span>Change area</button>
+                <button disabled={step===0} onClick={()=>moveToStep(step-1)}><span>←</span>Previous</button>
+                {step===activeLesson.length-1?<button className="next-application" onClick={()=>{setMirrorOpen(false);go("preview");}}><span>✓</span>Finish look</button>:<button className="next-application" onClick={()=>moveToStep(step+1)}><span>→</span>Next product</button>}
                 <button aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}><span>{guideMotion?"Ⅱ":"▶"}</span>{guideMotion?"Pause arrows":"Play arrows"}</button>
                 <button onClick={()=>setGuideCorner(value=>value==="right"?"left":"right")}><span>⇄</span>Move guide</button>
                 <button aria-pressed={guideExpanded} onClick={()=>setGuideExpanded(value=>!value)}><span>{guideExpanded?"↙":"↗"}</span>{guideExpanded?"Shrink guide":"Expand guide"}</button>
@@ -660,29 +643,28 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
                 <button className="stop-camera" onClick={()=>setMirrorOpen(false)}><span>■</span>Stop camera</button>
               </div>
             </div>:personalizedGuide()}
-            {!choosingFeature&&<div className="glam-face-caption"><span>{mirrorOpen?"Live mirror · on-device tracking":"Camera paused · scanned-face guide"}</span><b>{areaSummary(currentLesson)}</b></div>}
+            <div className="glam-face-caption"><span>{mirrorOpen?"Live mirror · on-device tracking":"Camera paused · scanned-face guide"}</span><b>{currentLesson.product} · {areaSummary(currentLesson)}</b></div>
           </section>
           <aside className={`glam-lesson-card${lessonPanelOpen?" panel-open":" panel-closed"}`}>
-            <button className="lesson-panel-handle" aria-expanded={lessonPanelOpen} onClick={()=>setLessonPanelOpen(value=>!value)}><span/><b>{choosingFeature?"Choose a feature":`${currentLesson.product} · Step ${step+1}`}</b><small>{lessonPanelOpen?"Hide":"Details"}</small></button>
-            <div className="lesson-panel-content">{choosingFeature?<div className="feature-welcome"><p className="eyebrow">Choose your lesson area</p><h2>Pick one feature.</h2><p>Select from the list below. We’ll gather every tutorial step that affects it and keep the original product order.</p><div className="available-list">{availableFeatures.map((feature,index)=><button key={feature} onClick={()=>chooseFeature(feature)}><small>{String(index+1).padStart(2,"0")}</small><b>{featureLabels[feature]}</b><span>→</span></button>)}</div></div>:<>
-              <div className="lesson-progress"><span>{selectedFeature?featureLabels[selectedFeature]:"Choose a feature"}</span><span>Step {step+1} of {activeLesson.length}</span></div>
+            <button className="lesson-panel-handle" aria-expanded={lessonPanelOpen} onClick={()=>setLessonPanelOpen(value=>!value)}><span/><b>{currentLesson.product} · Step {step+1}</b><small>{lessonPanelOpen?"Hide":"Details"}</small></button>
+            <div className="lesson-panel-content">
+              <div className="lesson-progress"><span>Application queue</span><span>Step {step+1} of {activeLesson.length}</span></div>
               <div className="dots">{activeLesson.map((_,index)=><i key={index} className={index<=step?"active":""}/>)}</div>
-              {selectedFeature&&<button className="change-feature" onClick={()=>{setSelectedFeature(null);setMirrorOpen(false);setStep(0);}}>← Choose another face area</button>}
               <p className="eyebrow">Now we’re using</p><h2>{currentLesson.product}</h2>
-              <div className="area-chips">{visibleAreas(currentLesson).map(area=><span key={area}>{areaLabels[area]}</span>)}</div>
+              <div className="area-chips">{stepAreas(currentLesson).map(area=><span key={area}>{areaLabels[area]}</span>)}</div>
               <p className="instruction">{currentLesson.instruction}</p>
-              {tutorialVideoUrl&&<div className="tutorial-clip-control"><button className="outline" onClick={()=>setTutorialClipOpen(value=>!value)}>{tutorialClipOpen?"Hide tutorial clip":"View tutorial clip"}</button>{tutorialClipOpen&&<TutorialClip src={tutorialVideoUrl} start={currentLesson.startTimeSeconds} end={currentLesson.endTimeSeconds} product={currentLesson.product}/>}</div>}
-              {!tutorialVideoUrl&&<div className="tutorial-cue"><small>FROM YOUR TUTORIAL</small><p>{currentLesson.referenceCue}</p></div>}
+              {tutorialVideoUrl&&!currentLesson.addedByBestie&&<div className="tutorial-clip-control"><button className="outline" onClick={()=>setTutorialClipOpen(value=>!value)}>{tutorialClipOpen?"Hide tutorial clip":"View tutorial clip"}</button>{tutorialClipOpen&&<TutorialClip src={tutorialVideoUrl} start={currentLesson.startTimeSeconds} end={currentLesson.endTimeSeconds} product={currentLesson.product}/>}</div>}
+              {(!tutorialVideoUrl||currentLesson.addedByBestie)&&<div className="tutorial-cue"><small>{currentLesson.addedByBestie?"ADDED FOR CORRECT APPLICATION":"FROM YOUR TUTORIAL"}</small><p>{currentLesson.referenceCue}</p></div>}
               <div className="personalized-direction"><small>PLACEMENT FOR YOUR FACE</small><p>{currentLesson.adaptation}</p>{personalizedPlacement!==currentLesson.adaptation&&<p>{personalizedPlacement}</p>}{blueprintPlacement&&<p className="blueprint-direction"><b>From your Face Blueprint:</b> {blueprintPlacement}</p>}</div>
               <div className="step-target"><small>THIS STEP IS READY WHEN</small><p>{currentLesson.checkpoint}</p></div>
-              {currentLesson.uncertain&&<div className="uncertain-step"><b>Uncertain tutorial detail</b><span>This product, shade, or hidden technique could not be confirmed from the analyzed frames.</span></div>}
+              {currentLesson.uncertain&&<div className="uncertain-step"><b>{currentLesson.addedByBestie?"Preparation recommendation":"Uncertain tutorial detail"}</b><span>{currentLesson.addedByBestie?"This necessary preparation was not visible in the sampled tutorial, so it is clearly identified as Makeup Bestie guidance.":"This product, shade, or hidden technique could not be confirmed from the analyzed frames."}</span></div>}
               {previewImage&&<div className="finished-mini"><img src={previewImage} alt="Your personalized finished look"/><span><small>YOUR FINISHED TARGET</small><b>{brief?.title}</b></span></div>}
               {!mirrorOpen&&<div className="mirror-option"><div><b>Live mirror paused</b><span>Restart it whenever you are ready. Landmarks stay on this device; no camera frames are uploaded.</span></div><button className="outline" onClick={()=>setMirrorOpen(true)}>Restart live mirror</button></div>}
               <div className="glam-actions">
                 <button className="outline" disabled={step===0} onClick={()=>moveToStep(step-1)}>← Previous</button>
-                {step===activeLesson.length-1?<button className="primary" onClick={()=>{setMirrorOpen(false);go("preview");}}>Finish {selectedFeature?featureLabels[selectedFeature].toLowerCase():"feature"} ✓</button>:<button className="primary" onClick={()=>moveToStep(step+1)}>Done—next product →</button>}
+                {step===activeLesson.length-1?<button className="primary" onClick={()=>{setMirrorOpen(false);go("preview");}}>Finish look ✓</button>:<button className="primary" onClick={()=>moveToStep(step+1)}>Done—next product →</button>}
               </div>
-            </>}</div>
+            </div>
           </aside>
         </div>
       </main>
@@ -716,7 +698,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     </main></>;
   }
 
-  return <>{nav}<main className="app-dashboard app-screen page-enter"><header className="dashboard-greeting"><p>{greeting}, {firstName}.</p><h1>What routine do you<br/>have in mind?</h1><span>Bring the tutorial first. We’ll study it before asking for today’s face photo.</span></header><section className="routine-composer"><div className="composer-heading"><span>＋</span><div><small>CREATE A PERSONALIZED LESSON</small><h2>Drop the routine here.</h2></div></div><label className="dashboard-link"><span>↗</span><input type="url" inputMode="url" value={lookUrl} onChange={event=>{setLookUrl(event.target.value);setLessonError("");}} placeholder="Paste a TikTok, Instagram, YouTube, or public video link"/></label><div className="composer-divider"><span>or</span></div><label className="dashboard-upload"><span>▶</span><div><b>{lookFile?lookFile.name:"Upload the tutorial video"}</b><small>MP4, WebM, or MOV · only content you can use</small></div><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event=>{const file=event.target.files?.[0]||null;setLookFile(file);setTutorialVideoUrl(file?URL.createObjectURL(file):"");setLessonError("");}}/></label><button className="primary composer-continue" disabled={!lookUrl.trim()&&!lookFile} onClick={()=>go("studio-intake")}>Continue with this routine →</button></section>{brief&&<section className="continue-card"><div><small>CONTINUE WHERE YOU LEFT OFF</small><h2>{brief.title}</h2><p>{mapStatus==="ready"?"Your personalized preview and feature lesson are ready.":"Tutorial analyzed · today’s face photo is next."}</p></div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Continue →</button></section>}<section className="dashboard-steps"><article><span>01</span><b>We study the tutorial</b><p>Real frames, product order, and technique.</p></article><article><span>02</span><b>You take today’s photo</b><p>Local face mapping adapts the routine.</p></article><article><span>03</span><b>You enter the Glam Room</b><p>Feature-by-feature guidance on a large live mirror.</p></article></section></main></>;
+  return <>{nav}<main className="app-dashboard app-screen page-enter"><header className="dashboard-greeting"><p>{greeting}, {firstName}.</p><h1>What routine do you<br/>have in mind?</h1><span>Bring the tutorial first. We’ll study it before asking for today’s face photo.</span></header><section className="routine-composer"><div className="composer-heading"><span>＋</span><div><small>CREATE A PERSONALIZED LESSON</small><h2>Drop the routine here.</h2></div></div><label className="dashboard-link"><span>↗</span><input type="url" inputMode="url" value={lookUrl} onChange={event=>{setLookUrl(event.target.value);setLessonError("");}} placeholder="Paste a TikTok, Instagram, YouTube, or public video link"/></label><div className="composer-divider"><span>or</span></div><label className="dashboard-upload"><span>▶</span><div><b>{lookFile?lookFile.name:"Upload the tutorial video"}</b><small>MP4, WebM, or MOV · only content you can use</small></div><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event=>{const file=event.target.files?.[0]||null;setLookFile(file);setTutorialVideoUrl(file?URL.createObjectURL(file):"");setLessonError("");}}/></label><button className="primary composer-continue" disabled={!lookUrl.trim()&&!lookFile} onClick={()=>go("studio-intake")}>Continue with this routine →</button></section>{brief&&<section className="continue-card"><div><small>CONTINUE WHERE YOU LEFT OFF</small><h2>{brief.title}</h2><p>{mapStatus==="ready"?"Your personalized preview and application queue are ready.":"Tutorial analyzed · today’s face photo is next."}</p></div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Continue →</button></section>}<section className="dashboard-steps"><article><span>01</span><b>We study the tutorial</b><p>Real frames, product order, and technique.</p></article><article><span>02</span><b>You take today’s photo</b><p>Local face mapping adapts the routine.</p></article><article><span>03</span><b>You enter the Glam Room</b><p>Application-by-application guidance on a large live mirror.</p></article></section></main></>;
 }
 
 export default function App() {

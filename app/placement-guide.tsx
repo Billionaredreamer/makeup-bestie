@@ -24,7 +24,7 @@ export type GuideProps = {
   stepNumber?: number;
   /** Freezes the blending arrows without hiding them. */
   paused?: boolean;
-  /** Keeps part-by-part mode confined to the feature the user selected. */
+  /** Keeps the overlay confined to the face areas used by the current application. */
   focused?: boolean;
   /** The live mirror is flipped, so badges must be flipped back to stay readable. */
   mirrored?: boolean;

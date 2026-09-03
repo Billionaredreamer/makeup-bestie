@@ -145,9 +145,9 @@ test("long faces get hairline shading added to a contour step", () => {
 
 test("a focused feature chart never adds a different facial area", () => {
   const cheekOnly = buildPlacement(points, ["both-cheeks"], "contour", "oblong", FIXTURE_ASPECT, false);
-  assert.ok(cheekOnly.every(zone => zone.id.includes("cheek")), "part-by-part cheek mode stays on the cheeks");
+  assert.ok(cheekOnly.every(zone => zone.id.includes("cheek")), "a cheek application stays on the cheeks");
   const jawOnly = buildPlacement(points, ["jaw"], "contour", "oblong", FIXTURE_ASPECT, false);
-  assert.ok(jawOnly.every(zone => zone.id.includes("jaw")), "part-by-part jaw mode stays on the jaw");
+  assert.ok(jawOnly.every(zone => zone.id.includes("jaw")), "a jaw application stays on the jaw");
 });
 
 test("overlapping areas in one step never draw the same shape twice", () => {

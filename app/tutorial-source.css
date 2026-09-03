@@ -574,11 +574,11 @@
   .live-target img { height: 92px; }
 }
 
-/* Personalized, feature-by-feature Glam Room */
-.part-by-part-ready { display: grid; gap: 5px; margin: 18px 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--cream); }
-.part-by-part-ready small { color: var(--rose); font-size: 8px; letter-spacing: .12em; }
-.part-by-part-ready b { font: 17px Georgia, serif; }
-.part-by-part-ready span { color: var(--muted); font-size: 9px; line-height: 1.45; }
+/* Personalized, application-by-application Glam Room */
+.application-queue-ready { display: grid; gap: 5px; margin: 18px 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--cream); }
+.application-queue-ready small { color: var(--rose); font-size: 8px; letter-spacing: .12em; }
+.application-queue-ready b { font: 17px Georgia, serif; }
+.application-queue-ready span { color: var(--muted); font-size: 9px; line-height: 1.45; }
 
 .glam-room { max-width: 1320px; margin: auto; padding: 34px 28px 90px; }
 .glam-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 18px; }
@@ -589,7 +589,6 @@
 .offline-pill i { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #b27b47; }
 .offline-pill.active i { background: #58a36c; }
 .glam-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(330px, .65fr); gap: 18px; align-items: start; }
-.choosing-feature .glam-grid { grid-template-columns: minmax(0, 1.1fr) minmax(360px, .9fr); }
 .glam-face-card { overflow: hidden; border: 1px solid var(--line); border-radius: 22px; background: #2f211d; box-shadow: 0 24px 65px rgba(56,35,29,.13); }
 .glam-face { position: relative; width: 100%; max-height: 760px; margin: auto; background: #2f211d; }
 .glam-face > img { display: block; width: 100%; height: 100%; object-fit: fill; }
@@ -675,6 +674,9 @@
 .mirror-toolbar { position: absolute; z-index: 9; right: 14px; bottom: 14px; left: 14px; display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 5px; padding: 7px; border: 1px solid rgba(255,255,255,.24); border-radius: 17px; background: rgba(37,23,20,.82); box-shadow: 0 14px 40px rgba(10,5,4,.3); backdrop-filter: blur(14px); }
 .mirror-toolbar button { display: grid; place-items: center; gap: 3px; min-width: 0; min-height: 49px; padding: 6px 3px; border: 0; border-radius: 11px; background: transparent; color: rgba(255,250,244,.86); font-size: 7px; font-weight: 700; white-space: nowrap; }
 .mirror-toolbar button:hover,.mirror-toolbar button[aria-pressed="true"] { background: rgba(255,250,244,.13); color: white; }
+.mirror-toolbar button:disabled { cursor: not-allowed; opacity: .32; }
+.mirror-toolbar .next-application { background: rgba(168,86,68,.45); color: white; }
+.mirror-toolbar .next-application:hover { background: rgba(168,86,68,.72); }
 .mirror-toolbar button span { font-size: 15px; font-weight: 400; line-height: 1; }
 .mirror-toolbar .stop-camera { color: #ffb8ac; }
 .mirror-toolbar .stop-camera:hover { background: rgba(187,74,59,.22); }
@@ -701,7 +703,6 @@
 .glam-lesson-card { position: sticky; top: 94px; max-height: calc(100vh - 115px); overflow: auto; padding: 23px; border: 1px solid var(--line); border-radius: 22px; background: white; scrollbar-width: thin; }
 .glam-lesson-card h2 { margin: 0 0 12px; font: 36px/1.05 Georgia, serif; }
 .lesson-panel-handle { display: none; }
-.change-feature { margin: 10px 0 18px; border: 0; background: none; color: var(--rose); padding: 0; font-size: 9px; font-weight: 700; }
 .personalized-direction { margin: 13px 0; padding: 14px; border-radius: 14px; background: #fff0ea; }
 .personalized-direction small { color: var(--rose); font-size: 8px; letter-spacing: .13em; }
 .personalized-direction p { margin: 7px 0 0; color: var(--brown); font: 12px/1.5 Georgia, serif; }
@@ -732,15 +733,6 @@
 .glam-actions .primary { box-shadow: none; }
 .glam-actions button:disabled { opacity: .35; cursor: not-allowed; }
 
-.feature-picker { position: relative; width: 100%; min-height: 520px; background: #2f211d; }
-.feature-picker > img { display: block; width: 100%; height: 100%; min-height: 520px; object-fit: cover; opacity: .9; }
-.feature-welcome > p:not(.eyebrow) { color: var(--muted); font: 13px/1.6 Georgia, serif; }
-.available-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 20px; }
-.available-list button { display: grid; grid-template-columns: auto 1fr auto; gap: 9px; align-items: center; min-height: 59px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--cream); color: var(--brown); text-align: left; transition: transform .18s ease, border-color .18s ease, background .18s ease; }
-.available-list button:hover { transform: translateY(-2px); border-color: var(--rose); background: #fff4ee; }
-.available-list button small { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: white; color: var(--rose); font-size: 7px; }
-.available-list button b { overflow: hidden; font: 14px Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
-.available-list button span { color: var(--rose); }
 /* The mirror is sized to the camera's own aspect ratio, so nothing is cropped
    and the chart lands on the face instead of on a guess at where it is. */
 .silent-mirror { position: relative; align-self: center; width: 100%; overflow: hidden; background: #1f1613; }
@@ -754,7 +746,6 @@
 
 @media (max-width: 900px) {
   .glam-grid { grid-template-columns: 1fr; }
-  .choosing-feature .glam-grid { grid-template-columns: 1fr; }
   .glam-lesson-card { position: static; order: 2; max-height: none; }
   .glam-face-card { max-width: 680px; margin: auto; }
 }
@@ -777,7 +768,6 @@
   .panel-closed .lesson-panel-handle { border-radius: 23px; }
   .panel-closed .lesson-panel-content { display: none; }
   .glam-actions { grid-template-columns: 1fr; }
-  .feature-picker,.feature-picker > img { min-height: 445px; }
   .animated-guide-pip { top: 52px; width: 37%; min-width: 126px; border-radius: 14px; }
   .animated-guide-pip.corner-right { right: 9px; }
   .animated-guide-pip.corner-left { left: 9px; }
@@ -790,9 +780,6 @@
   .mirror-toolbar button { flex: 0 0 72px; min-height: 45px; font-size: 6px; }
   .mirror-toolbar button span { font-size: 13px; }
   .glam-face-caption { padding: 11px 13px; font-size: 8px; }
-  .available-list { gap: 6px; margin-top: 15px; }
-  .available-list button { min-height: 54px; padding: 9px; }
-  .available-list button b { font-size: 13px; }
   .mirror-option { grid-template-columns: 1fr; }
   .zone-badge b { width: 19px; height: 19px; font-size: 9px; }
   .zone-badge small { font-size: 7px; padding: 3px 6px; }
@@ -800,7 +787,6 @@
 }
 
 @media (max-width: 380px) {
-  .available-list { grid-template-columns: 1fr; }
   .glam-heading h1 { font-size: 28px; }
 }
 
@@ -1005,8 +991,7 @@
 .discover-coming-card h1 { margin: 0 0 16px; font: 44px/.98 Georgia,serif; }
 .discover-coming-card p:not(.eyebrow) { margin: 0 auto 22px; color: rgba(255,255,255,.75); font: 13px/1.6 Georgia,serif; }
 
-/* Once a feature is selected, the Glam Room becomes an immersive portrait
-   camera instead of a dashboard-sized landscape card. */
+/* The Glam Room is an immersive portrait camera for the full application queue. */
 .glam-room.lesson-active { max-width: none; min-height: 100dvh; padding: 14px 20px 24px; background: radial-gradient(circle at 50% 20%,#51362f,#1a100e 68%); color: white; }
 .lesson-active .glam-heading { width: min(920px,100%); margin: 0 auto 10px; }
 .lesson-active .glam-heading h1 { font-size: 25px; color: white; -webkit-line-clamp: 1; }
