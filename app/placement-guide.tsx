@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { FaceShape, Point } from "@/lib/face-analysis";
 import { buildPlacement, type LessonRegion, type Technique } from "@/lib/placement-map";
+import type { FaceBlueprint } from "@/lib/face-blueprint";
 
 /**
  * Draws one lesson step the way a makeup artist charts it: the outline of where
@@ -11,6 +12,7 @@ import { buildPlacement, type LessonRegion, type Technique } from "@/lib/placeme
  */
 export type GuideProps = {
   points: Point[]; areas: LessonRegion[]; technique: Technique; shape: FaceShape | null;
+  blueprint?: FaceBlueprint | null;
   /** Photo width ÷ height, so the chart is never stretched out of shape. */
   aspect?: number;
   /** Optional portrait display crop. Geometry still uses the uncropped camera aspect. */
@@ -29,12 +31,12 @@ export type GuideProps = {
 };
 
 export function PlacementGuide({
-  points, areas, technique, shape, aspect = 0.75, displayAspect, id = "current",
+  points, areas, technique, shape, blueprint = null, aspect = 0.75, displayAspect, id = "current",
   soft = false, stepNumber, paused = false, focused = false, mirrored = false,
 }: GuideProps) {
   const zones = useMemo(
-    () => buildPlacement(points, areas, technique, shape, aspect, !focused),
-    [points, areas, technique, shape, aspect, focused],
+    () => buildPlacement(points, areas, technique, shape, aspect, !focused, blueprint),
+    [points, areas, technique, shape, aspect, focused, blueprint],
   );
   if (!zones.length) return null;
   const labelPosition = (sourceX: number, sourceY: number) => {

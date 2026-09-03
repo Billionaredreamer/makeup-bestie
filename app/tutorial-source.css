@@ -211,6 +211,102 @@
 
 .scan-result-card > .primary { margin-top: auto; }
 
+.face-blueprint-card {
+  margin-top: 18px;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 25px;
+  background: #fff;
+}
+
+.face-blueprint-card > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.face-blueprint-card h2 {
+  margin: 3px 0 0;
+  font: 32px Georgia, serif;
+}
+
+.face-blueprint-card > header > span {
+  padding: 8px 11px;
+  border-radius: 99px;
+  background: var(--cream);
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.blueprint-intro {
+  max-width: 680px;
+  margin: 12px 0 20px;
+  color: var(--muted);
+  font: 13px/1.55 Georgia, serif;
+}
+
+.blueprint-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.blueprint-feature-grid article {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+
+.blueprint-feature-grid article > b { font: 20px Georgia, serif; }
+.blueprint-feature-grid article > small { margin-top: auto; color: var(--muted); font-size: 8px; line-height: 1.4; }
+.blueprint-feature-grid label { display: grid; gap: 5px; }
+.blueprint-feature-grid label span { color: var(--rose); font-size: 7px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.blueprint-feature-grid select { width: 100%; min-width: 0; padding: 9px 8px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--brown); font-size: 10px; }
+
+.skin-today {
+  display: grid;
+  grid-template-columns: minmax(190px, .55fr) 1.45fr;
+  align-items: center;
+  gap: 18px;
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--cream);
+}
+
+.skin-today > div:first-child { display: grid; gap: 5px; }
+.skin-today > div:first-child b { font: 16px Georgia, serif; }
+.skin-today > div:first-child small { color: var(--muted); font-size: 8px; line-height: 1.4; }
+.skin-today > div:last-child { display: flex; flex-wrap: wrap; gap: 7px; }
+.skin-today button { padding: 8px 10px; border: 1px solid var(--line); border-radius: 99px; background: #fff; color: var(--muted); font-size: 9px; }
+.skin-today button.selected { border-color: var(--rose); background: #fbefea; color: var(--rose); }
+.blueprint-honesty { margin: 12px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.blueprint-continue { display: block; min-width: 300px; margin: 18px 0 0 auto; }
+.blueprint-direction { padding-top: 8px; border-top: 1px solid rgba(168,86,68,.18); }
+
+.profile-blueprint {
+  display: grid;
+  grid-template-columns: .65fr 1.35fr auto;
+  align-items: center;
+  gap: 22px;
+  margin: 0 0 18px;
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--cream);
+}
+
+.profile-blueprint small { color: var(--rose); font-size: 7px; letter-spacing: .12em; }
+.profile-blueprint h2 { margin: 5px 0 0; font: 20px Georgia, serif; }
+.profile-blueprint p { margin: 0; color: var(--brown); font: 12px/1.55 Georgia, serif; text-transform: capitalize; }
+.profile-blueprint > span { color: var(--muted); font-size: 8px; line-height: 1.4; }
+
 .launch-link-box { margin: 28px 0 20px; }
 
 .product-shelf {
@@ -458,6 +554,9 @@
   .launch-scan-heading { display: block; }
   .launch-scan-heading .map-status { display: inline-block; margin-top: 8px; }
   .launch-scan-grid { grid-template-columns: 1fr; }
+  .blueprint-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .skin-today { grid-template-columns: 1fr; }
+  .profile-blueprint { grid-template-columns: 1fr; gap: 9px; }
   .product-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .live-target { width: 145px; }
   .live-target img { height: 112px; }
@@ -466,6 +565,10 @@
 @media (max-width: 480px) {
   .product-options { grid-template-columns: 1fr; }
   .launch-scan-shell { margin-top: 12px; }
+  .face-blueprint-card { padding: 20px 16px; }
+  .face-blueprint-card > header { display: grid; align-items: start; }
+  .blueprint-feature-grid { grid-template-columns: 1fr; }
+  .blueprint-continue { width: 100%; min-width: 0; }
   .face-first-flow { gap: 2px; }
   .live-target { top: 55px; right: 10px; width: 128px; }
   .live-target img { height: 92px; }

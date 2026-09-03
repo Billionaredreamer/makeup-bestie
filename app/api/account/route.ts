@@ -2,21 +2,30 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
+import { normalizeFaceBlueprint } from "@/lib/face-blueprint";
+
+const PROFILE_FIELDS = "display_name,skin_type,skin_tone,experience,makeup_goal,products,face_shape";
+
+function isMissingFaceBlueprintColumn(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  return error.code === "PGRST204" || error.code === "42703" || Boolean(error.message?.includes("face_blueprint"));
+}
 
 export async function GET() {
   const supabase = await createSupabaseServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0,0,0,0);
-  const [profileResult, subscriptionResult, usageResult] = await Promise.all([
-    supabase.from("profiles").select("display_name,skin_type,skin_tone,experience,makeup_goal,products,face_shape").eq("user_id",auth.user.id).maybeSingle(),
+  const [profileResult, blueprintResult, subscriptionResult, usageResult] = await Promise.all([
+    supabase.from("profiles").select(PROFILE_FIELDS).eq("user_id",auth.user.id).maybeSingle(),
+    supabase.from("profiles").select("face_blueprint").eq("user_id",auth.user.id).maybeSingle(),
     supabase.from("subscriptions").select("plan,status,current_period_end,cancel_at_period_end").eq("user_id",auth.user.id).maybeSingle(),
     supabase.from("ai_usage_events").select("operation,status,created_at").eq("user_id",auth.user.id).in("status",["reserved","completed"]).gte("created_at",monthStart.toISOString()),
   ]);
-  if (profileResult.error || subscriptionResult.error || usageResult.error) {
+  if (profileResult.error || (blueprintResult.error && !isMissingFaceBlueprintColumn(blueprintResult.error)) || subscriptionResult.error || usageResult.error) {
     return NextResponse.json({ error: "Your account could not be loaded. Please refresh and try again." }, { status: 500 });
   }
-  const profile = profileResult.data;
+  const profile = profileResult.data ? { ...profileResult.data, face_blueprint: blueprintResult.data?.face_blueprint ?? null } : null;
   const subscription = subscriptionResult.data;
   const usage = usageResult.data;
   const recentReservationCutoff = Date.now() - 15 * 60 * 1000;
@@ -36,7 +45,14 @@ export async function PATCH(request: Request) {
   if (!auth.user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return NextResponse.json({ error: "Profile details were not valid." }, { status: 400 });
-  const { data: current } = await supabase.from("profiles").select("display_name,skin_type,skin_tone,experience,makeup_goal,products,face_shape").eq("user_id",auth.user.id).maybeSingle();
+  const [{ data: current }, currentBlueprintResult] = await Promise.all([
+    supabase.from("profiles").select(PROFILE_FIELDS).eq("user_id",auth.user.id).maybeSingle(),
+    supabase.from("profiles").select("face_blueprint").eq("user_id",auth.user.id).maybeSingle(),
+  ]);
+  if (currentBlueprintResult.error && !isMissingFaceBlueprintColumn(currentBlueprintResult.error)) {
+    return NextResponse.json({ error: "Your profile could not be loaded." }, { status: 500 });
+  }
+  const currentBlueprint = currentBlueprintResult.data?.face_blueprint ?? null;
   const profile = {
     user_id: auth.user.id,
     display_name: String(body.display_name ?? current?.display_name ?? "").trim().slice(0,80),
@@ -46,9 +62,15 @@ export async function PATCH(request: Request) {
     makeup_goal: String(body.makeup_goal ?? current?.makeup_goal ?? "").slice(0,120),
     products: Array.isArray(body.products) ? body.products.map(String).slice(0,40) : current?.products ?? [],
     face_shape: body.face_shape === null ? null : body.face_shape ? String(body.face_shape).slice(0,30) : current?.face_shape ?? null,
+    face_blueprint: body.face_blueprint === null ? null : normalizeFaceBlueprint(body.face_blueprint) ?? currentBlueprint,
     updated_at: new Date().toISOString(),
   };
-  const { error } = await supabase.from("profiles").upsert(profile, { onConflict: "user_id" });
+  let { error } = await supabase.from("profiles").upsert(profile, { onConflict: "user_id" });
+  if (isMissingFaceBlueprintColumn(error)) {
+    const { face_blueprint: _faceBlueprint, ...compatibleProfile } = profile;
+    void _faceBlueprint;
+    ({ error } = await supabase.from("profiles").upsert(compatibleProfile, { onConflict: "user_id" }));
+  }
   if (error) return NextResponse.json({ error: "Your profile could not be saved." }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

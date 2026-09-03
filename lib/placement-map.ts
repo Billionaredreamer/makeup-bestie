@@ -1,4 +1,5 @@
 import type { FaceShape, Point } from "./face-analysis";
+import type { FaceBlueprint } from "./face-blueprint";
 
 /**
  * Turns MediaPipe face landmarks into a makeup artist's face chart: the exact
@@ -349,7 +350,7 @@ function edgeAt(a: FaceAnchors, y: number, outward: -1 | 1): number {
   return near.x + (other.x - near.x) * t;
 }
 
-function cheekZone(a: FaceAnchors, side: Side, technique: Technique, tune: Tuning): PlacementZone {
+function cheekZone(a: FaceAnchors, side: Side, technique: Technique, tune: Tuning, blueprint:FaceBlueprint|null): PlacementZone {
   const parts = sideParts(a, side);
   const apple = applePoint(a, side);
   const id = `${technique}-cheek-${side}`;
@@ -357,7 +358,8 @@ function cheekZone(a: FaceAnchors, side: Side, technique: Technique, tune: Tunin
   if (technique === "blush") {
     // From the apple, angled up toward the top of the ear. How steeply it climbs
     // and how far out it reaches are the two things face shape actually changes.
-    const endY = apple.y - a.height * tune.blushLift;
+    const confirmedLift = blueprint?.cheeks.placement === "higher" ? 0.035 : blueprint?.cheeks.placement === "lower" ? -0.015 : 0;
+    const endY = apple.y - a.height * (tune.blushLift + confirmedLift);
     const endX = edgeAt(a, endY, parts.outward) - parts.outward * a.width * tune.blushInset;
     const templeEnd = pt(endX, endY);
     const center = lerp(apple, templeEnd, 0.45);
@@ -428,7 +430,7 @@ function underEyeZone(a: FaceAnchors, side: Side): PlacementZone {
   };
 }
 
-function lidZone(a: FaceAnchors, side: Side, technique: Technique): PlacementZone {
+function lidZone(a: FaceAnchors, side: Side, technique: Technique, blueprint:FaceBlueprint|null): PlacementZone {
   const parts = sideParts(a, side);
   const browCenter = centroid(parts.browRing);
   const eyeCenter = parts.eyeCenter;
@@ -438,9 +440,10 @@ function lidZone(a: FaceAnchors, side: Side, technique: Technique): PlacementZon
     const lashInner = shift(parts.eyeInner, 0, -a.height * 0.004);
     const lashTop = shift(eyeCenter, 0, -a.height * 0.022);
     const lashOuter = shift(parts.eyeOuter, 0, -a.height * 0.006);
+    const wingRise = blueprint?.eyes.direction === "softly downturned" ? 0.055 : blueprint?.eyes.direction === "softly lifted" ? 0.028 : 0.038;
     const wingTip = pt(
       parts.eyeOuter.x + parts.outward * a.width * 0.075,
-      parts.eyeOuter.y - a.height * 0.035,
+      parts.eyeOuter.y - a.height * wingRise,
     );
     return {
       id: `eyeliner-${side}`, label: `${parts.label} lash line`, side: parts.outward,
@@ -464,11 +467,13 @@ function lidZone(a: FaceAnchors, side: Side, technique: Technique): PlacementZon
   // Shadow: the mobile lid, the crease above it, and the outer V — measured from
   // the eye's own lash line up toward the brow, so it fits the eye it is drawn on.
   const lashY = Math.min(...parts.eyeRing.map(point => point.y));
-  const ceilingY = lashY - (lashY - browCenter.y) * 0.85;
+  const lidReach = blueprint?.eyes.openness === "narrow visible lid" ? 0.62 : blueprint?.eyes.openness === "open visible lid" ? 0.92 : 0.82;
+  const ceilingY = lashY - (lashY - browCenter.y) * lidReach;
   const inner = shift(parts.eyeInner, parts.outward * a.width * 0.006, -a.height * 0.006);
+  const shadowRise = blueprint?.eyes.direction === "softly downturned" ? 0.052 : blueprint?.eyes.direction === "softly lifted" ? 0.027 : 0.037;
   const outerV = pt(
     parts.eyeOuter.x + parts.outward * a.width * 0.05,
-    parts.eyeOuter.y - a.height * 0.035,
+    parts.eyeOuter.y - a.height * shadowRise,
   );
   const ring = [
     inner,
@@ -487,18 +492,19 @@ function lidZone(a: FaceAnchors, side: Side, technique: Technique): PlacementZon
   };
 }
 
-function browZone(a: FaceAnchors, side: Side): PlacementZone {
+function browZone(a: FaceAnchors, side: Side, blueprint:FaceBlueprint|null): PlacementZone {
   const parts = sideParts(a, side);
   const center = centroid(parts.browRing);
   const inner = parts.browRing.reduce((best, item) => (Math.abs(item.x - a.centerX) < Math.abs(best.x - a.centerX) ? item : best), parts.browRing[0]);
   const outer = parts.browRing.reduce((best, item) => (Math.abs(item.x - a.centerX) > Math.abs(best.x - a.centerX) ? item : best), parts.browRing[0]);
+  const headLift = blueprint?.brows.arch === "straighter" ? 0.006 : blueprint?.brows.arch === "defined arch" ? 0.018 : 0.012;
   return {
     id: `brow-${side}`, label: `${parts.label} brow`, side: parts.outward,
     outline: smooth(parts.browRing, true),
     // Brow hair is drawn in short upward-and-outward strokes: one at the head
     // of the brow, one carrying through the arch toward the tail.
     arrows: [
-      arrow(shift(inner, 0, a.height * 0.018), shift(inner, parts.outward * a.width * 0.03, -a.height * 0.012), 0.05),
+      arrow(shift(inner, 0, a.height * 0.018), shift(inner, parts.outward * a.width * 0.03, -a.height * headLift), 0.05),
       arrow(shift(center, -parts.outward * a.width * 0.01, a.height * 0.012), shift(outer, 0, -a.height * 0.006), 0.05),
     ],
     anchor: shift(center, 0, -a.height * 0.045),
@@ -539,12 +545,13 @@ function foreheadZone(a: FaceAnchors, technique: Technique): PlacementZone {
   };
 }
 
-function noseZone(a: FaceAnchors, technique: Technique): PlacementZone {
+function noseZone(a: FaceAnchors, technique: Technique, blueprint:FaceBlueprint|null): PlacementZone {
   const bridge = [a.noseTop, lerp(a.noseTop, a.noseTip, 0.5), a.noseTip];
   if (technique === "contour") {
+    const bridgeInset = blueprint?.nose.width === "wide" ? 0.038 : blueprint?.nose.width === "narrow" ? 0.052 : 0.045;
     const sideLine = (outward: -1 | 1) => [
-      pt(a.noseTop.x + outward * a.width * 0.045, a.noseTop.y),
-      pt(a.noseTip.x + outward * a.width * 0.05, lerp(a.noseTop, a.noseTip, 0.6).y),
+      pt(a.noseTop.x + outward * a.width * bridgeInset, a.noseTop.y),
+      pt(a.noseTip.x + outward * a.width * (bridgeInset + 0.005), lerp(a.noseTop, a.noseTip, 0.6).y),
       pt((outward === -1 ? a.noseAlarL : a.noseAlarR).x, a.noseTip.y + a.height * 0.008),
     ];
     const left = sideLine(-1);
@@ -649,6 +656,7 @@ export function buildPlacement(
   shape: FaceShape | null,
   aspect = 0.75,
   includeShapeComplements = true,
+  blueprint: FaceBlueprint | null = null,
 ): PlacementZone[] {
   const safeAspect = Number.isFinite(aspect) && aspect > 0.2 && aspect < 5 ? aspect : 0.75;
   const a = faceAnchors(points, safeAspect);
@@ -667,15 +675,15 @@ export function buildPlacement(
     }
     if (area === "forehead") { zones.push(foreheadZone(a, technique)); continue; }
     if (CHEEK_AREAS.includes(area)) {
-      sidesFor(area).forEach(side => zones.push(technique === "conceal" ? underEyeZone(a, side) : cheekZone(a, side, technique, tune)));
+      sidesFor(area).forEach(side => zones.push(technique === "conceal" ? underEyeZone(a, side) : cheekZone(a, side, technique, tune, blueprint)));
       continue;
     }
     if (EYE_AREAS.includes(area)) {
-      sidesFor(area).forEach(side => zones.push(technique === "conceal" ? underEyeZone(a, side) : lidZone(a, side, technique)));
+      sidesFor(area).forEach(side => zones.push(technique === "conceal" ? underEyeZone(a, side) : lidZone(a, side, technique, blueprint)));
       continue;
     }
-    if (area === "brows") { sidesFor("both-eyes").forEach(side => zones.push(browZone(a, side))); continue; }
-    if (area === "nose") { zones.push(noseZone(a, technique)); continue; }
+    if (area === "brows") { sidesFor("both-eyes").forEach(side => zones.push(browZone(a, side, blueprint))); continue; }
+    if (area === "nose") { zones.push(noseZone(a, technique, blueprint)); continue; }
     if (area === "lips") { zones.push(lipZone(a)); continue; }
     if (area === "jaw") { sidesFor("both-cheeks").forEach(side => zones.push(jawZone(a, side))); continue; }
   }

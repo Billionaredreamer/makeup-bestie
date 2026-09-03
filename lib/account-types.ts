@@ -1,3 +1,5 @@
+import type { FaceBlueprint } from "./face-blueprint";
+
 export type SubscriptionPlan = "plus" | "unlimited";
 
 export type BeautyProfileRecord = {
@@ -8,6 +10,7 @@ export type BeautyProfileRecord = {
   makeup_goal: string;
   products: string[];
   face_shape: string | null;
+  face_blueprint: FaceBlueprint | null;
 };
 
 export type SubscriptionRecord = {

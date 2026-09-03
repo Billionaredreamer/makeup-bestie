@@ -6,6 +6,15 @@ import { makeFaceLandmarks, FIXTURE_ASPECT } from "./face-fixture.mjs";
 const points = makeFaceLandmarks();
 const anchors = faceAnchors(points, FIXTURE_ASPECT);
 const plan = (areas, technique, shape = "oval") => buildPlacement(points, areas, technique, shape, FIXTURE_ASPECT);
+const blueprint = {
+  version: 1,
+  eyes: { openness: "balanced visible lid", direction: "level", spacing: "balanced" },
+  brows: { arch: "soft arch" },
+  nose: { width: "balanced", length: "balanced" },
+  lips: { balance: "balanced" },
+  cheeks: { placement: "centered" },
+  skinConcerns: [],
+};
 
 /** Every number that appears in an SVG path, so paths can be range-checked. */
 const numbersIn = path => (path.match(/-?\d+(\.\d+)?/g) || []).map(Number);
@@ -116,6 +125,15 @@ test("face shape changes where blush actually goes", () => {
   // A round face lifts colour toward the temple; a long face keeps it horizontal.
   assert.ok(round.anchor.y < oblong.anchor.y, "round faces get a higher, lifted sweep");
   assert.notEqual(round.outline, oblong.outline);
+});
+
+test("confirmed Face Blueprint changes the actual placement geometry", () => {
+  const higher = buildPlacement(points, ["right-cheek"], "blush", "oval", FIXTURE_ASPECT, true, {...blueprint,cheeks:{placement:"higher"}})[0];
+  const lower = buildPlacement(points, ["right-cheek"], "blush", "oval", FIXTURE_ASPECT, true, {...blueprint,cheeks:{placement:"lower"}})[0];
+  assert.ok(higher.anchor.y < lower.anchor.y, "confirmed cheek placement changes the blush sweep");
+  const liftedEye = buildPlacement(points, ["right-eye"], "eyeliner", "oval", FIXTURE_ASPECT, true, {...blueprint,eyes:{...blueprint.eyes,direction:"softly lifted"}})[0];
+  const downturnedEye = buildPlacement(points, ["right-eye"], "eyeliner", "oval", FIXTURE_ASPECT, true, {...blueprint,eyes:{...blueprint.eyes,direction:"softly downturned"}})[0];
+  assert.notEqual(liftedEye.outline, downturnedEye.outline, "confirmed eye direction changes the liner wing");
 });
 
 test("long faces get hairline shading added to a contour step", () => {
