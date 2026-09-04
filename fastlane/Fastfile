@@ -32,18 +32,16 @@ platform :ios do
       development: false,
     )
 
-    # sigh exports the profile name in an env var whose key embeds the profile
-    # type, and that type string has varied across fastlane versions
-    # ("appstore" vs "app-store"). Discover it rather than hard-coding it.
-    profile_name = ENV.keys
-                      .grep(/\Asigh_.*profile-name\z/)
-                      .map { |k| ENV[k] }
-                      .reject { |v| v.to_s.empty? }
-                      .first
+    # This fastlane version publishes the profile details through lane_context
+    # (SIGH_NAME / SIGH_UUID) and sets no sigh_* environment variables, so read
+    # them from there. Fall back to the UUID, which
+    # PROVISIONING_PROFILE_SPECIFIER also accepts.
+    profile_name = lane_context[SharedValues::SIGH_NAME]
+    profile_name = lane_context[SharedValues::SIGH_UUID] if profile_name.to_s.empty?
 
     if profile_name.to_s.empty?
-      UI.important("sigh_* env keys present: #{ENV.keys.grep(/\Asigh_/).join(', ')}")
-      UI.user_error!("Could not determine the provisioning profile name from sigh")
+      UI.important("lane_context keys: #{lane_context.keys.join(', ')}")
+      UI.user_error!("Could not determine the provisioning profile from sigh")
     end
     UI.message("Using provisioning profile: #{profile_name}")
 
