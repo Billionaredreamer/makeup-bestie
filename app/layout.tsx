@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NativeLaunchMoment } from "./native-launch-moment";
 import "./globals.css";
 import "./tutorial-source.css";
 
@@ -25,7 +26,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <NativeLaunchMoment />
+        <div className="app-shell">{children}</div>
+      </body>
     </html>
   );
 }

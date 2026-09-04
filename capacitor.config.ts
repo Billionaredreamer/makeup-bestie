@@ -14,7 +14,16 @@ const config: CapacitorConfig = {
     cleartext: false,
   },
   ios: {
-    contentInset: "always",
+    // The web app owns edge-to-edge layout through CSS safe-area variables.
+    // Native insets here would be applied a second time and create black bars.
+    contentInset: "never",
+  },
+  plugins: {
+    SplashScreen: {
+      launchAutoHide: false,
+      backgroundColor: "#fffaf4",
+      showSpinner: false,
+    },
   },
 };
 

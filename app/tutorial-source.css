@@ -1064,3 +1064,172 @@ body.glam-room-open { background: #170e0c; }
 .legal-page{min-height:100vh;max-width:800px;margin:auto;padding:70px 28px 110px;color:var(--brown)}.legal-home{display:inline-block;margin-bottom:70px;color:var(--rose);font-weight:700}.legal-page>h1{font:400 clamp(48px,7vw,76px)/.97 Georgia,serif;letter-spacing:-.045em;margin:10px 0 12px}.legal-updated{color:var(--muted);font-size:11px;margin-bottom:54px}.legal-page section{padding:27px 0;border-top:1px solid var(--line)}.legal-page h2{font:27px Georgia,serif;margin:0 0 11px}.legal-page section p{font:15px/1.72 Georgia,serif;color:var(--muted);margin:0}.legal-page section a{color:var(--rose)}
 @media(max-width:800px){.auth-screen{grid-template-columns:1fr}.auth-editorial{min-height:270px;padding:45px 24px}.auth-editorial h1{font-size:52px}.auth-editorial>p:not(.eyebrow){font-size:14px;margin:18px 0}.auth-card{margin:24px auto;padding:32px 22px}.auth-mark{margin-bottom:30px}.pricing-intro{margin-top:35px}.pricing-grid{grid-template-columns:1fr}.pricing-grid article{padding:31px 24px}.account-management{align-items:flex-start;flex-direction:column}.billing-action,.billing-action button{width:100%}.save-look-control{align-items:flex-start!important;flex-direction:column}.save-look-control button{width:100%}.profile-account-actions{align-items:flex-start;flex-direction:column}.legal-page{padding-top:38px}.legal-home{margin-bottom:45px}}
 @media(max-width:520px){.profile .stat-row{grid-template-columns:1fr}.profile .stat-row div{border-right:0;border-bottom:1px solid var(--line);padding:18px}.profile .stat-row div:last-child{border-bottom:0}.profile-details{grid-template-columns:1fr}.profile-legal-links{gap:14px}.profile-account-actions{gap:12px}}
+
+/* Shared alignment system -------------------------------------------------
+   The app screens use one content edge, spacing rhythm and card language.
+   Full-bleed camera/feed surfaces stay full-bleed by design. */
+.app-screen,
+.studio-intake-card,
+.brief-shell,
+.launch-scan-shell,
+.preview-shell {
+  width: 100%;
+}
+
+.app-screen {
+  max-width: var(--content-max);
+  padding-inline: var(--content-gutter);
+}
+
+.routine-composer,
+.continue-card,
+.dashboard-steps { width: min(100%, 880px); }
+
+.screen-heading,
+.dashboard-greeting,
+.creator-heading,
+.preview-heading,
+.launch-scan-heading,
+.brief-heading { margin-bottom: var(--space-6); }
+
+.routine-composer,
+.continue-card,
+.discover-preview,
+.looks-empty,
+.saved-look-card,
+.creator-details,
+.scan-photo-card,
+.scan-result-card,
+.face-blueprint-card,
+.product-shelf,
+.brief-grid > article,
+.lesson-outline,
+.preview-stage,
+.preview-plan,
+.question-card,
+.import-card,
+.pricing-grid article,
+.account-management,
+.profile-blueprint {
+  border-radius: var(--radius-card);
+}
+
+.dashboard-link,
+.dashboard-upload,
+.account-fields input,
+.auth-card input,
+.choice-grid button,
+.source-option,
+.product-options label { border-radius: var(--radius-control); }
+
+.auth-screen,
+.pricing-screen,
+.cloud-loading,
+.legal-page {
+  min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
+}
+
+.pricing-header,
+.pricing-intro,
+.pricing-grid,
+.pricing-error,
+.pricing-confirming,
+.pricing-footnote {
+  width: 100%;
+}
+
+.bottom-nav {
+  right: max(14px, var(--safe-right));
+  left: max(14px, var(--safe-left));
+  bottom: max(14px, var(--safe-bottom));
+  width: auto;
+  transform: none;
+}
+
+@media (max-width: 700px) {
+  .app-nav { padding-inline: var(--mobile-gutter); }
+  .bottom-nav {
+    right: var(--safe-right);
+    bottom: 0;
+    left: var(--safe-left);
+    width: auto;
+    padding: 7px 6px max(7px, var(--safe-bottom));
+  }
+  .app-screen,
+  .simple-page,
+  .onboarding { padding-inline: var(--mobile-gutter); }
+  .app-screen {
+    min-height: calc(100dvh - 58px - var(--safe-top) - var(--safe-bottom));
+    padding-top: var(--space-6);
+    padding-bottom: calc(92px + var(--safe-bottom));
+  }
+  .screen-heading,
+  .dashboard-greeting,
+  .creator-heading,
+  .preview-heading,
+  .launch-scan-heading,
+  .brief-heading { margin-bottom: var(--space-5); }
+  .screen-heading h1,
+  .preview-heading h1,
+  .launch-scan-heading h1,
+  .studio-intake-card > h1,
+  .creator-heading h1 { font-size: clamp(38px, 11vw, 48px); }
+  .routine-composer,
+  .continue-card,
+  .discover-preview,
+  .looks-empty,
+  .saved-look-card,
+  .creator-details,
+  .scan-photo-card,
+  .scan-result-card,
+  .face-blueprint-card,
+  .product-shelf,
+  .brief-grid > article,
+  .lesson-outline,
+  .preview-stage,
+  .preview-plan,
+  .question-card,
+  .import-card,
+  .pricing-grid article,
+  .account-management,
+  .profile-blueprint { padding: var(--space-5); }
+  .dashboard-steps,
+  .cloud-look-grid,
+  .brief-grid,
+  .launch-scan-grid,
+  .preview-layout { gap: var(--space-4); }
+  .pricing-header { height: 64px; padding-inline: var(--mobile-gutter); }
+  .pricing-intro { margin: var(--space-6) auto var(--space-5); padding-inline: var(--mobile-gutter); }
+  .pricing-intro h1 { font-size: clamp(42px, 12vw, 56px); }
+  .pricing-grid { gap: var(--space-4); padding-inline: var(--mobile-gutter); }
+  .pricing-grid article { min-width: 0; }
+  .pricing-grid h2 b { font-size: clamp(40px, 12vw, 48px); }
+  .auth-editorial { padding-inline: var(--mobile-gutter); }
+  .auth-card { width: calc(100% - (var(--mobile-gutter) * 2)); padding: var(--space-5); }
+  .creator-camera { top: auto; }
+  .discover-feed {
+    height: calc(100dvh - 58px - var(--safe-top));
+    padding-bottom: var(--safe-bottom);
+  }
+  .discover-video { height: calc(100dvh - 58px - var(--safe-top) - var(--safe-bottom)); }
+  .empty-discover { padding: var(--space-4) var(--mobile-gutter) calc(82px + var(--safe-bottom)); }
+}
+
+@media (max-width: 600px) {
+  .glam-room.lesson-active {
+    padding: 0;
+  }
+  .lesson-active .glam-grid {
+    inset: 0;
+  }
+  .lesson-active .glam-heading {
+    top: var(--safe-top);
+    right: var(--safe-right);
+    left: var(--safe-left);
+    padding: 13px 78px 42px 13px;
+  }
+  .lesson-active .glam-lesson-card { bottom: calc(7px + var(--safe-bottom)); }
+  .lesson-active .animated-guide-pip,
+  .lesson-active .mirror-status { top: calc(var(--safe-top) + 72px); }
+  .lesson-active .live-coach-dock { top: calc(var(--safe-top) + 121px); }
+}

@@ -16,3 +16,95 @@
 @media(max-width:560px){.preview-stage{grid-template-columns:1fr}.preview-stage>.preview-arrow{transform:rotate(90deg);text-align:center}.preview-stage>.intensity-picker,.preview-stage>.error,.preview-stage>.primary{grid-column:1}}
 .source-grid.two-sources{grid-template-columns:repeat(2,minmax(0,1fr));max-width:680px}.lesson-outline{margin-top:20px;background:white;border:1px solid var(--line);border-radius:24px;padding:28px}.lesson-outline h2{font:31px Georgia,serif;margin:7px 0 18px}.lesson-outline>div{display:grid;grid-template-columns:1fr 1fr;gap:10px}.lesson-outline article{display:grid;grid-template-columns:auto 1fr;gap:13px;padding:15px;border-radius:15px;background:var(--cream)}.lesson-outline article>span{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--blush);color:var(--rose);font-size:9px}.lesson-outline article b{font:17px Georgia,serif}.lesson-outline article p{margin:5px 0;color:var(--muted);font-size:10px;line-height:1.45}.lesson-outline article small{color:var(--rose);font-size:9px;line-height:1.4}.analysis-scope{padding:13px;border-radius:13px;background:#f3ece6;color:var(--muted);font-size:11px;line-height:1.5}.tutorial-cue{background:var(--cream);border-radius:14px;padding:13px;margin:13px 0}.tutorial-cue small{color:var(--rose);font-size:8px;letter-spacing:.13em}.tutorial-cue p{margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.45}.camera-top span:last-child{transition:.2s}.scan-retry-note{margin:12px 0 0;color:#a4473d;font-size:11px;line-height:1.5}
 @media(max-width:800px){.source-grid.two-sources,.lesson-outline>div{grid-template-columns:1fr}.brief-actions{gap:8px}}
+
+/* Edge-to-edge iOS shell. Capacitor leaves the WKWebView full-screen and the
+   web layer consumes the real device insets instead of guessing at heights. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --content-max: 1180px;
+  --content-gutter: clamp(18px, 3vw, 28px);
+  --mobile-gutter: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --radius-card: 24px;
+  --radius-control: 14px;
+}
+
+html, body { width: 100%; min-height: 100%; background: var(--paper); }
+body { min-height: 100dvh; overflow-x: hidden; }
+.app-shell {
+  min-height: 100dvh;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  background: var(--paper);
+}
+.nav-shell {
+  top: calc(-1 * var(--safe-top));
+  margin-top: calc(-1 * var(--safe-top));
+  padding-top: var(--safe-top);
+}
+.progress { top: calc(76px + var(--safe-top)); }
+.glam-lesson-card { top: calc(94px + var(--safe-top)); }
+.creator-camera { top: calc(80px + var(--safe-top)); }
+.toast {
+  bottom: calc(25px + var(--safe-bottom));
+  max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 32px);
+  text-align: center;
+}
+
+.native-launch-moment {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  background: #fffaf4;
+}
+.native-launch-logo {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  color: var(--brown);
+  opacity: 1;
+  transform: scale(1);
+}
+.native-launch-logo span {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: var(--rose);
+  color: white;
+  font: italic 700 68px/1 Georgia, serif;
+}
+.native-launch-logo b { font: 700 22px/1 Georgia, serif; }
+.native-launch-moment.is-playing { animation: launch-surface-out 760ms ease both; }
+.native-launch-moment.is-playing .native-launch-logo { animation: launch-logo-beat 760ms cubic-bezier(.2,.75,.28,1) both; }
+@keyframes launch-logo-beat {
+  0% { opacity: .82; transform: scale(.94); }
+  42% { opacity: 1; transform: scale(1.035); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes launch-surface-out {
+  0%, 72% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .native-launch-moment.is-playing,
+  .native-launch-moment.is-playing .native-launch-logo { animation-duration: 180ms; }
+}
+
+@media (max-width: 800px) {
+  :root { --content-gutter: var(--mobile-gutter); --radius-card: 22px; }
+  .progress { top: calc(58px + var(--safe-top)); }
+  .onboarding, .simple-page { min-height: calc(100dvh - 58px - var(--safe-top) - var(--safe-bottom)); }
+}
