@@ -22,6 +22,8 @@ UI.message("KEY DIAGNOSTIC len=#{k.length} lines=#{k.lines.count} pem=#{k.includ
     # there is no separate certificates repo (match) to maintain.
     build_app(
       project: "ios/App/App.xcodeproj",
+api_key: api_key,
+api_key: api_key,
       scheme: "App",
       export_method: "app-store",
       xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} CODE_SIGN_STYLE=Automatic",
