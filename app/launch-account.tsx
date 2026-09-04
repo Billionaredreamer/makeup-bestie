@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import type { AccountSnapshot, BeautyProfileRecord } from "@/lib/account-types";
 import { cloudAccountsConfigured, getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { clearOnboardingCache } from "@/lib/onboarding-flow";
 
 export type LaunchAccount = {
   configured: boolean;
@@ -52,9 +53,12 @@ export function useLaunchAccount(): LaunchAccount {
   }, [refresh]);
 
   const signOut = useCallback(async () => {
+    const currentUserId = user?.id;
     await getSupabaseBrowserClient()?.auth.signOut();
+    clearOnboardingCache(currentUserId);
+    window.localStorage.removeItem("makeup-bestie-profile-v1");
     setSnapshot(null); setUser(null);
-  }, []);
+  }, [user?.id]);
 
   return { configured: cloudAccountsConfigured, loading, user, snapshot, refresh, saveProfile, signOut };
 }
