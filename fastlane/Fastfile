@@ -47,6 +47,7 @@ platform :ios do
       app_identifier: APP_IDENTIFIER,
       api_key: api_key,
       git_url: ENV["MATCH_GIT_URL"],
+      git_branch: "main",
       storage_mode: "git",
       keychain_name: keychain_name,
       keychain_password: keychain_password,
