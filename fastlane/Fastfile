@@ -1,51 +1,66 @@
 default_platform(:ios)
 
+APP_IDENTIFIER = "com.makeupbestie.app".freeze
+
 platform :ios do
   desc "Build and upload a new build to TestFlight"
   lane :beta do
-    # The APP_STORE_CONNECT_KEY_CONTENT secret may hold either the raw .p8
-    # PEM text or a base64 blob. Normalise it, then write it to disk so that
-    # xcodebuild itself can authenticate (see xcargs below).
+    # APP_STORE_CONNECT_KEY_CONTENT may hold either the raw .p8 PEM text or a
+    # base64 blob, so normalise it before use.
     raw_key = ENV["APP_STORE_CONNECT_KEY_CONTENT"].to_s.strip
     key_pem = raw_key.include?("BEGIN") ? raw_key : raw_key.unpack1("m")
-    key_path = File.join(Dir.pwd, "AuthKey_ci.p8")
-    File.write(key_path, key_pem)
 
-    app_store_connect_api_key(
+    api_key = app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
       issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
       key_content: key_pem,
       is_key_content_base64: false,
     )
 
+    # Explicitly create/fetch the distribution certificate and the App Store
+    # provisioning profile using the API key. This replaces
+    # -allowProvisioningUpdates, which kept asking Xcode for a *development*
+    # profile and failed on a runner with no signed-in Apple account.
+    cert(
+      api_key: api_key,
+      development: false,
+    )
+
+    sigh(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      development: false,
+    )
+
+    profile_name = ENV["sigh_#{APP_IDENTIFIER}_appstore_profile-name"]
+    UI.user_error!("sigh did not report a profile name") if profile_name.to_s.empty?
+    UI.message("Using provisioning profile: #{profile_name}")
+
     increment_build_number(
       build_number: ENV["GITHUB_RUN_NUMBER"] || Time.now.strftime("%Y%m%d%H%M"),
       xcodeproj: "ios/App/App.xcodeproj",
     )
 
-    # Automatic signing on CI: xcodebuild runs as its own process and cannot
-    # see fastlane's API session, so the App Store Connect key is passed to it
-    # explicitly. With -allowProvisioningUpdates this lets Xcode create the
-    # distribution certificate and provisioning profile on demand, which is
-    # why no match/certificates repo is needed.
     build_app(
       project: "ios/App/App.xcodeproj",
       scheme: "App",
+      configuration: "Release",
       export_method: "app-store",
+      export_options: {
+        provisioningProfiles: { APP_IDENTIFIER => profile_name },
+        signingStyle: "manual",
+      },
       xcargs: [
-        "-allowProvisioningUpdates",
-        "-authenticationKeyPath", key_path,
-        "-authenticationKeyID", ENV["APP_STORE_CONNECT_KEY_ID"].to_s,
-        "-authenticationKeyIssuerID", ENV["APP_STORE_CONNECT_ISSUER_ID"].to_s,
         "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']}",
-        "CODE_SIGN_STYLE=Automatic",
+        "CODE_SIGN_STYLE=Manual",
+        %(PROVISIONING_PROFILE_SPECIFIER="#{profile_name}"),
+        %(CODE_SIGN_IDENTITY="Apple Distribution"),
       ].join(" "),
     )
 
     upload_to_testflight(
+      api_key: api_key,
       skip_waiting_for_build_processing: true,
     )
-  ensure
-    File.delete(key_path) if key_path && File.exist?(key_path)
   end
 end
