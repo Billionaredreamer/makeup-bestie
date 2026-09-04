@@ -18,6 +18,7 @@ export type SubscriptionRecord = {
   status: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  source?: "stripe" | "apple";
 };
 
 export type AccountSnapshot = {
