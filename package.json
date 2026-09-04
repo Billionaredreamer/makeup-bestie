@@ -11,10 +11,16 @@
     "start": "next start",
     "lint": "eslint . --ignore-pattern .next",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/face-analysis.test.mjs tests/placement-map.test.mjs"
+    "test": "node --test tests/face-analysis.test.mjs tests/placement-map.test.mjs",
+    "ios:sync": "cap sync ios",
+    "ios:open": "cap open ios"
   },
   "dependencies": {
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/ios": "^8.5.1",
     "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
+    "@revenuecat/purchases-capacitor": "^13.5.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "drizzle-orm": "0.45.2",

@@ -19,7 +19,7 @@ export async function GET() {
   const [profileResult, blueprintResult, subscriptionResult, usageResult] = await Promise.all([
     supabase.from("profiles").select(PROFILE_FIELDS).eq("user_id",auth.user.id).maybeSingle(),
     supabase.from("profiles").select("face_blueprint").eq("user_id",auth.user.id).maybeSingle(),
-    supabase.from("subscriptions").select("plan,status,current_period_end,cancel_at_period_end").eq("user_id",auth.user.id).maybeSingle(),
+    supabase.from("subscriptions").select("plan,status,current_period_end,cancel_at_period_end,source").eq("user_id",auth.user.id).maybeSingle(),
     supabase.from("ai_usage_events").select("operation,status,created_at").eq("user_id",auth.user.id).in("status",["reserved","completed"]).gte("created_at",monthStart.toISOString()),
   ]);
   if (profileResult.error || (blueprintResult.error && !isMissingFaceBlueprintColumn(blueprintResult.error)) || subscriptionResult.error || usageResult.error) {
@@ -80,7 +80,13 @@ export async function DELETE() {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   const admin=createSupabaseAdminClient();
-  const {data:subscription}=await admin.from("subscriptions").select("stripe_subscription_id,status").eq("user_id",auth.user.id).maybeSingle();
+  const {data:subscription}=await admin.from("subscriptions").select("source,stripe_subscription_id,status").eq("user_id",auth.user.id).maybeSingle();
+  if(subscription?.source==="apple"&&["active","past_due"].includes(subscription.status)){
+    // Apple subscriptions can only be cancelled by the subscriber in the
+    // App Store, not by this server. Require that first so people don't
+    // delete their account while Apple keeps billing them.
+    return NextResponse.json({error:"Cancel your subscription in the App Store (Settings → your name → Subscriptions) first, then delete your account."},{status:409});
+  }
   if(subscription?.stripe_subscription_id&&["active","trialing","past_due"].includes(subscription.status)){
     try{await getStripe().subscriptions.cancel(subscription.stripe_subscription_id);}
     catch{return NextResponse.json({error:"Your subscription could not be cancelled, so your account was not deleted. Open billing or contact support."},{status:502});}

@@ -1,0 +1,33 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload a new build to TestFlight"
+  lane :beta do
+    api_key = app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+      key_content: ENV["APP_STORE_CONNECT_KEY_CONTENT"],
+      is_key_content_base64: true,
+    )
+
+    increment_build_number(
+      build_number: ENV["GITHUB_RUN_NUMBER"] || Time.now.strftime("%Y%m%d%H%M"),
+      xcodeproj: "ios/App/App.xcodeproj",
+    )
+
+    # Uses Xcode's automatic signing and lets the App Store Connect API key
+    # create/update the certificate and provisioning profile as needed, so
+    # there is no separate certificates repo (match) to maintain.
+    build_app(
+      project: "ios/App/App.xcodeproj",
+      scheme: "App",
+      export_method: "app-store",
+      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} CODE_SIGN_STYLE=Automatic",
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true,
+    )
+  end
+end
