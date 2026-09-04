@@ -73,6 +73,19 @@ platform :ios do
       xcodeproj: "ios/App/App.xcodeproj",
     )
 
+    # Configure distribution signing on the app target only. Command-line
+    # signing overrides are inherited by Swift package dependencies, whose
+    # resource bundles do not support provisioning profiles.
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "ios/App/App.xcodeproj",
+      team_id: ENV["APPLE_TEAM_ID"],
+      code_sign_identity: "Apple Distribution",
+      profile_name: profile_name,
+      targets: ["App"],
+      build_configurations: ["Release"],
+    )
+
     build_app(
       project: "ios/App/App.xcodeproj",
       scheme: "App",
