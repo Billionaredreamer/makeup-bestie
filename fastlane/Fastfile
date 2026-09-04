@@ -82,12 +82,10 @@ platform :ios do
         provisioningProfiles: { APP_IDENTIFIER => profile_name },
         signingStyle: "manual",
       },
-      xcargs: [
-        "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']}",
-        "CODE_SIGN_STYLE=Manual",
-        %(PROVISIONING_PROFILE_SPECIFIER="#{profile_name}"),
-        %(CODE_SIGN_IDENTITY="Apple Distribution"),
-      ].join(" "),
+      # Keep the provisioning profile scoped to the app in export_options.
+      # Passing it through xcargs applies it to every dependency target too,
+      # including RevenueCat resource bundles that cannot be provisioned.
+      xcargs: "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']}",
     )
 
     upload_to_testflight(
