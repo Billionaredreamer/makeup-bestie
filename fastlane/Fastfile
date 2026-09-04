@@ -3,13 +3,19 @@ default_platform(:ios)
 platform :ios do
   desc "Build and upload a new build to TestFlight"
   lane :beta do
-k = ENV["APP_STORE_CONNECT_KEY_CONTENT"].to_s
-UI.message("KEY DIAGNOSTIC len=#{k.length} lines=#{k.lines.count} pem=#{k.include?('BEGIN')} key_id_len=#{ENV['APP_STORE_CONNECT_KEY_ID'].to_s.length} issuer_len=#{ENV['APP_STORE_CONNECT_ISSUER_ID'].to_s.length}")
-    api_key = app_store_connect_api_key(
+    # The APP_STORE_CONNECT_KEY_CONTENT secret may hold either the raw .p8
+    # PEM text or a base64 blob. Normalise it, then write it to disk so that
+    # xcodebuild itself can authenticate (see xcargs below).
+    raw_key = ENV["APP_STORE_CONNECT_KEY_CONTENT"].to_s.strip
+    key_pem = raw_key.include?("BEGIN") ? raw_key : raw_key.unpack1("m")
+    key_path = File.join(Dir.pwd, "AuthKey_ci.p8")
+    File.write(key_path, key_pem)
+
+    app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
       issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
-      key_content: ENV["APP_STORE_CONNECT_KEY_CONTENT"].to_s.strip,
-      is_key_content_base64: !ENV["APP_STORE_CONNECT_KEY_CONTENT"].to_s.include?("BEGIN"),
+      key_content: key_pem,
+      is_key_content_base64: false,
     )
 
     increment_build_number(
@@ -17,21 +23,29 @@ UI.message("KEY DIAGNOSTIC len=#{k.length} lines=#{k.lines.count} pem=#{k.includ
       xcodeproj: "ios/App/App.xcodeproj",
     )
 
-    # Uses Xcode's automatic signing and lets the App Store Connect API key
-    # create/update the certificate and provisioning profile as needed, so
-    # there is no separate certificates repo (match) to maintain.
+    # Automatic signing on CI: xcodebuild runs as its own process and cannot
+    # see fastlane's API session, so the App Store Connect key is passed to it
+    # explicitly. With -allowProvisioningUpdates this lets Xcode create the
+    # distribution certificate and provisioning profile on demand, which is
+    # why no match/certificates repo is needed.
     build_app(
       project: "ios/App/App.xcodeproj",
-api_key: api_key,
-api_key: api_key,
       scheme: "App",
       export_method: "app-store",
-      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} CODE_SIGN_STYLE=Automatic",
+      xcargs: [
+        "-allowProvisioningUpdates",
+        "-authenticationKeyPath", key_path,
+        "-authenticationKeyID", ENV["APP_STORE_CONNECT_KEY_ID"].to_s,
+        "-authenticationKeyIssuerID", ENV["APP_STORE_CONNECT_ISSUER_ID"].to_s,
+        "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']}",
+        "CODE_SIGN_STYLE=Automatic",
+      ].join(" "),
     )
 
     upload_to_testflight(
-      api_key: api_key,
       skip_waiting_for_build_processing: true,
     )
+  ensure
+    File.delete(key_path) if key_path && File.exist?(key_path)
   end
 end
