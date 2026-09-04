@@ -18,9 +18,9 @@ platform :ios do
     )
 
     # Explicitly create/fetch the distribution certificate and the App Store
-    # provisioning profile using the API key. This replaces
-    # -allowProvisioningUpdates, which kept asking Xcode for a *development*
-    # profile and failed on a runner with no signed-in Apple account.
+    # provisioning profile using the API key, rather than relying on
+    # -allowProvisioningUpdates (which resolves to a *development* profile on a
+    # runner with no signed-in Apple account).
     cert(
       api_key: api_key,
       development: false,
@@ -32,8 +32,19 @@ platform :ios do
       development: false,
     )
 
-    profile_name = ENV["sigh_#{APP_IDENTIFIER}_appstore_profile-name"]
-    UI.user_error!("sigh did not report a profile name") if profile_name.to_s.empty?
+    # sigh exports the profile name in an env var whose key embeds the profile
+    # type, and that type string has varied across fastlane versions
+    # ("appstore" vs "app-store"). Discover it rather than hard-coding it.
+    profile_name = ENV.keys
+                      .grep(/\Asigh_.*profile-name\z/)
+                      .map { |k| ENV[k] }
+                      .reject { |v| v.to_s.empty? }
+                      .first
+
+    if profile_name.to_s.empty?
+      UI.important("sigh_* env keys present: #{ENV.keys.grep(/\Asigh_/).join(', ')}")
+      UI.user_error!("Could not determine the provisioning profile name from sigh")
+    end
     UI.message("Using provisioning profile: #{profile_name}")
 
     increment_build_number(
