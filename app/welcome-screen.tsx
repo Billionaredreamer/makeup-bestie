@@ -9,7 +9,7 @@ export function WelcomeScreen({ onStart, onSignIn }: { onStart: () => void; onSi
     return () => { delete document.documentElement.dataset.welcome; };
   }, []);
 
-  return <main className="welcome-screen">
+  return <main className="brand-image welcome-screen">
     <div className="welcome-content">
       <span className="welcome-mark" aria-label="Makeup Bestie">m</span>
       <h1>See a look.<br/>Make it yours.</h1>

@@ -11,6 +11,7 @@ import { extractTutorialFrames, extractTutorialFramesFromUrl } from "@/lib/video
 import { CreatorStudio, DiscoverFeed } from "./routine-community";
 import { CloudConfigurationScreen, CloudLoadingScreen, type LaunchAccount, useLaunchAccount } from "./launch-account";
 import { UnauthenticatedShell } from "./welcome-screen";
+import { BrandHeader } from "./brand-header";
 import { ManageBillingButton, PricingScreen } from "./pricing-screen";
 import type { SavedLookRecord } from "@/lib/account-types";
 import {
@@ -325,7 +326,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   useEffect(() => () => { if (prepPhoto) URL.revokeObjectURL(prepPhoto); }, [prepPhoto]);
   useEffect(() => () => { if (tutorialVideoUrl) URL.revokeObjectURL(tutorialVideoUrl); }, [tutorialVideoUrl]);
   const onboardingView=view==="peek"||view==="onboarding"||view==="pricing";
-  const nav = <>{!immersiveLesson&&!onboardingView&&<header className="nav-shell app-nav-shell"><nav className="nav app-nav"><Logo home={() => go("home")} />{profileComplete?<button className="account-chip" onClick={()=>go("profile")}><span>{firstName.charAt(0).toUpperCase()}</span><b>{firstName}</b></button>:<span className="local-profile-note">{account.configured?"Private account":"Local development profile"}</span>}</nav></header>}{!immersiveLesson&&profileComplete&&!onboardingView&&<nav className="bottom-nav" aria-label="Primary navigation">
+  const nav = <>{!immersiveLesson&&!onboardingView&&view!=="home"&&view!=="profile"&&<header className="nav-shell app-nav-shell"><nav className="nav app-nav"><Logo home={() => go("home")} />{profileComplete?<button className="account-chip" onClick={()=>go("profile")}><span>{firstName.charAt(0).toUpperCase()}</span><b>{firstName}</b></button>:<span className="local-profile-note">{account.configured?"Private account":"Local development profile"}</span>}</nav></header>}{!immersiveLesson&&profileComplete&&!onboardingView&&<nav className="bottom-nav" aria-label="Primary navigation">
     <button className={homeFlowActive?"active":""} onClick={()=>go("home")}><i>⌂</i><span>Home</span></button>
     <button className={view==="profile"||view==="my-looks"?"active":""} onClick={()=>go("profile")}><i>○</i><span>Profile</span></button>
   </nav>}</>;
@@ -746,10 +747,13 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
 
   if (view === "profile") {
     const savedLookCount = account.configured?savedLooks.length:(brief&&saveSessionPhotos?1:0);
-    return <>{nav}<main className="profile app-screen page-enter">
-      <section className="profile-top">
+    return <>{nav}<main className="profile app-screen band-page">
+      <BrandHeader variant="profile"><div className="profile-banner-identity">
         <div className="avatar large">{firstName.charAt(0).toUpperCase()}</div>
-        <div><p className="eyebrow">Your private beauty profile</p><h1>{profileName}</h1><p>{profileEmail} · {answers.skin||"Skin not set"} · {answers.goal||"Goal not set"}</p></div>
+        <div><h1>{profileName}</h1><span className="profile-plan-pill">{account.snapshot?.subscription?.plan==="unlimited"?"Unlimited":account.snapshot?.subscription?.plan==="plus"?"Makeup Bestie Plus":"Beauty profile"}</span></div>
+      </div></BrandHeader>
+      <div className="working-surface">
+      <section className="profile-summary-row"><div><p className="eyebrow">Your private beauty profile</p><p>{profileEmail} · {answers.skin||"Skin not set"} · {answers.goal||"Goal not set"}</p></div>
         <button className="outline" onClick={()=>{setOnboard(0);setView("onboarding");window.scrollTo(0,0);}}>Edit profile</button>
       </section>
       <div className="stat-row">
@@ -763,10 +767,11 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       <section className="account-management"><div><small>SUBSCRIPTION</small><b>{account.snapshot?.subscription?.plan==="unlimited"?"Makeup Bestie Unlimited":"Makeup Bestie Plus"}</b><p>{account.snapshot?.subscription?.cancel_at_period_end?"Cancels at the end of the current billing period.":account.snapshot?.subscription?.source==="apple"?"Active · manage or cancel through your Apple ID subscriptions.":"Active · manage or cancel securely through Stripe."}</p></div>{account.configured&&<ManageBillingButton/>}</section>
       <p className="profile-note">Your beauty preferences and deliberately saved looks sync privately to your account. Landmark coordinates and Glam Room camera footage remain on your device. Bare-face scans are not stored.</p>
       {account.configured&&<><div className="profile-legal-links"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div><div className="profile-account-actions"><button className="text-button" onClick={()=>void account.signOut()}>Sign out</button><button className="text-button danger" onClick={()=>void deleteAccount()}>Delete account and data</button></div></>}
+      </div>
     </main></>;
   }
 
-  return <>{nav}<main className="app-dashboard app-screen page-enter"><header className="dashboard-greeting"><p>Hello {firstName},</p><h1>What routine do you have in mind?</h1><span>Bring the tutorial first. We’ll study it before asking for today’s face photo.</span></header><section className="routine-composer"><div className="composer-heading"><span>＋</span><div><small>CREATE A PERSONALIZED LESSON</small><h2>Drop the routine here.</h2></div></div><label className="dashboard-link"><span>↗</span><input type="url" inputMode="url" value={lookUrl} onChange={event=>{setLookUrl(event.target.value);setLessonError("");}} placeholder="Paste a TikTok, Instagram, YouTube, or public video link"/></label><div className="composer-divider"><span>or</span></div><label className="dashboard-upload"><span>▶</span><div><b>{lookFile?lookFile.name:"Upload the tutorial video"}</b><small>MP4, WebM, or MOV · only content you can use</small></div><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event=>{const file=event.target.files?.[0]||null;setLookFile(file);setTutorialVideoUrl(file?URL.createObjectURL(file):"");setLessonError("");}}/></label><button className="primary composer-continue" disabled={!lookUrl.trim()&&!lookFile} onClick={()=>go("studio-intake")}>Continue with this routine →</button></section>{brief&&<section className="continue-card"><div><small>CONTINUE WHERE YOU LEFT OFF</small><h2>{brief.title}</h2><p>{mapStatus==="ready"?"Your personalized preview and application queue are ready.":"Tutorial analyzed · today’s face photo is next."}</p></div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Continue →</button></section>}<section className="dashboard-steps"><article><span>01</span><b>We study the tutorial</b><p>Real frames, product order, and technique.</p></article><article><span>02</span><b>You take today’s photo</b><p>Local face mapping adapts the routine.</p></article><article><span>03</span><b>You enter the Glam Room</b><p>Application-by-application guidance on a large live mirror.</p></article></section></main></>;
+  return <>{nav}<main className="app-dashboard app-screen band-page"><BrandHeader variant="home"><div className="dashboard-greeting"><p>Hello {firstName},</p><h1>What routine do you have in mind?</h1></div></BrandHeader><div className="working-surface"><p className="home-intro">Bring the tutorial first. We’ll study it before asking for today’s face photo.</p><section className="routine-composer"><div className="composer-heading"><span>＋</span><div><small>CREATE A PERSONALIZED LESSON</small><h2>Drop the routine here.</h2></div></div><label className="dashboard-link"><span>↗</span><input type="url" inputMode="url" value={lookUrl} onChange={event=>{setLookUrl(event.target.value);setLessonError("");}} placeholder="Paste a TikTok, Instagram, YouTube, or public video link"/></label><div className="composer-divider"><span>or</span></div><label className="dashboard-upload"><span>▶</span><div><b>{lookFile?lookFile.name:"Upload the tutorial video"}</b><small>MP4, WebM, or MOV · only content you can use</small></div><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event=>{const file=event.target.files?.[0]||null;setLookFile(file);setTutorialVideoUrl(file?URL.createObjectURL(file):"");setLessonError("");}}/></label><button className="primary composer-continue" disabled={!lookUrl.trim()&&!lookFile} onClick={()=>go("studio-intake")}>Continue with this routine →</button></section>{brief&&<section className="continue-card"><div><small>CONTINUE WHERE YOU LEFT OFF</small><h2>{brief.title}</h2><p>{mapStatus==="ready"?"Your personalized preview and application queue are ready.":"Tutorial analyzed · today’s face photo is next."}</p></div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Continue →</button></section>}<section className="dashboard-steps"><article><span>01</span><b>We study the tutorial</b><p>Real frames, product order, and technique.</p></article><article><span>02</span><b>You take today’s photo</b><p>Local face mapping adapts the routine.</p></article><article><span>03</span><b>You enter the Glam Room</b><p>Application-by-application guidance on a large live mirror.</p></article></section></div></main></>;
 }
 
 export default function App() {
