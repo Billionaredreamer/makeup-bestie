@@ -11,9 +11,9 @@
   isolation: isolate;
   position: relative;
   color-scheme: light;
-  color: var(--paper);
-  background-color: var(--rose);
-  background-image: url("/welcome-hero.jpg"), linear-gradient(155deg, var(--blush), var(--rose) 55%, var(--brown));
+  color: var(--brown);
+  background-color: var(--cream);
+  background-image: linear-gradient(168deg, #F7F0E7 0%, #F0DFD5 46%, #E8C9BD 100%);
   background-size: cover;
   background-position: center 22%;
 }
@@ -47,7 +47,7 @@
 }
 .brand-header { display: flex; align-items: flex-end; min-height: max(260px, 38dvh); padding-top: calc(32px + var(--safe-top)); }
 .brand-header::before { height: 100%; }
-.brand-header-profile { min-height: max(220px, 26dvh); }
+.brand-header-profile { min-height: min(24dvh, 220px); padding-top: calc(var(--safe-top) + 12px); }
 .brand-header-content, .working-surface { width: 100%; max-width: 1100px; margin-inline: auto; padding-inline: calc(24px + var(--safe-left)) calc(24px + var(--safe-right)); }
 .brand-header-content { padding-bottom: 28px; }
 .brand-header .dashboard-greeting { margin: 0; max-width: 540px; }
@@ -78,3 +78,35 @@
   .welcome-content { padding-top: calc(20px + var(--safe-top)); }
   .welcome-content h1 { font-size: 38px; }
 }
+
+/* Photo scrims only apply after the asset has actually loaded. */
+.brand-image:not(.has-media)::before, .brand-image:not(.has-media)::after { display: none; }
+.brand-image.has-media { color: var(--paper); }
+.brand-welcome.has-media { background-image: url('/welcome-hero.jpg'); }
+.brand-home.has-media { background-image: url('/home-hero.jpg'); }
+.brand-profile.has-media { background-image: url('/profile-hero.jpg'); }
+.brand-image:not(.has-media) .welcome-content p, .brand-image:not(.has-media) .welcome-signin { color: var(--muted); }
+.brand-image:not(.has-media) .profile-banner-identity h1 { color: var(--brown); }
+.profile-banner-identity h1 { font-size: 22px; }
+.status-guard { position: fixed; top: 0; left: 0; right: 0; height: var(--safe-top); z-index: 140; background: var(--paper); pointer-events: none; }
+.has-media > .status-guard { background: rgba(56,35,29,.85); }
+.home-poster.brand-image { position: fixed; inset: 0; display: flex; align-items: flex-end; overflow-y: auto; }
+.home-poster-content { width: 100%; max-width: 540px; margin: auto auto 0; padding: calc(var(--safe-top) + 24px) calc(var(--safe-right) + 24px) calc(var(--safe-bottom) + 100px) calc(var(--safe-left) + 24px); }
+.poster-greeting { font: 14px/1.5 Arial, sans-serif; color: var(--muted); margin: 0 0 12px; }
+.has-media .poster-greeting { color: rgba(255,250,244,.86); }
+.home-poster h1 { font: 400 30px/1.08 Georgia, serif; margin: 0 0 24px; color: inherit; }
+.poster-start { width: 100%; min-height: 52px; background: #A85644; color: #FFFAF4; font-weight: 600; }
+.home-poster .continue-card { background: rgba(255,250,244,.92); color: var(--brown); padding: 18px; margin: 0 0 24px; border-radius: 18px; }
+body:has(.home-poster) .bottom-nav { background: transparent; border: 0; }
+body:has(.home-poster.has-media) .bottom-nav button { color: var(--paper); }
+body:has(.home-poster) .bottom-nav button.active { color: var(--rose); background: rgba(255,250,244,.9); }
+.bottom-nav button.active { background: #F4E6DF; }
+.composer-sheet { position: fixed; inset: 0; z-index: 120; background: var(--paper); overflow-y: auto; padding: calc(var(--safe-top) + 16px) calc(var(--safe-right) + 20px) calc(var(--safe-bottom) + 32px) calc(var(--safe-left) + 20px); }
+.composer-sheet-content { max-width: 650px; margin: auto; }
+.composer-sheet .routine-composer { border: 1px solid #DDCEC2; border-radius: 18px; background: #FFFAF4; box-shadow: none; padding: 24px; }
+.composer-sheet .home-intro { margin: 16px 0 20px; }
+.composer-sheet .dashboard-link, .composer-sheet .dashboard-upload { border: 0; border-bottom: 1px solid #DDCEC2; background: #F7F0E7; border-radius: 0; box-shadow: none; }
+.composer-sheet .dashboard-link > span, .composer-sheet .dashboard-upload > span { color: #A85644; background: #F0DFD5; }
+.composer-sheet .composer-continue { background: #A85644; color: #FFFAF4; font-weight: 600; opacity: 1; }
+.composer-sheet .composer-continue:disabled { background: #F4E6DF; color: #B09A90; box-shadow: none; opacity: 1; }
+.brand-image button:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }

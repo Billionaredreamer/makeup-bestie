@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { BrandSurface } from "./brand-header";
 import { AuthScreen } from "./launch-account";
 
 export function WelcomeScreen({ onStart, onSignIn }: { onStart: () => void; onSignIn: () => void }) {
-  useEffect(() => {
-    document.documentElement.dataset.welcome = "true";
-    return () => { delete document.documentElement.dataset.welcome; };
-  }, []);
-
-  return <main className="brand-image welcome-screen">
+  return <BrandSurface variant="welcome" className="welcome-screen">
     <div className="welcome-content">
       <span className="welcome-mark" aria-label="Makeup Bestie">m</span>
       <h1>See a look.<br/>Make it yours.</h1>
@@ -17,7 +13,7 @@ export function WelcomeScreen({ onStart, onSignIn }: { onStart: () => void; onSi
       <button className="welcome-start" onClick={onStart}>Get started</button>
       <button className="welcome-signin" onClick={onSignIn}>I already have an account</button>
     </div>
-  </main>;
+  </BrandSurface>;
 }
 
 export function UnauthenticatedShell() {

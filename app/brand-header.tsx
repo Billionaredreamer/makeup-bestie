@@ -1,23 +1,30 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
-export function BrandHeader({ children, variant }: { children: ReactNode; variant: "home" | "profile" }) {
-  const header = useRef<HTMLElement>(null);
+// One switch for all photography; failed requests always retain the warm wash.
+const BRAND_MEDIA_ENABLED = true;
+
+export function BrandSurface({ children, variant, className = "" }: { children: ReactNode; variant: "welcome" | "home" | "profile"; className?: string }) {
+  const [hasMedia, setHasMedia] = useState(false);
   useEffect(() => {
-    const update = () => {
-      // The existing native bridge uses this signal for light status-bar text.
-      const safeTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--safe-top")) || 0;
-      document.documentElement.dataset.welcome = String((header.current?.getBoundingClientRect().bottom || 0) > safeTop);
-    };
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-      delete document.documentElement.dataset.welcome;
-    };
-  }, []);
-  return <header ref={header} className={`brand-image brand-header brand-header-${variant}`}><div className="brand-header-content">{children}</div></header>;
+    if (!BRAND_MEDIA_ENABLED) return;
+    let active = true;
+    const photo = new Image();
+    photo.onload = () => { if (active) setHasMedia(true); };
+    photo.src = `/${variant}-hero.jpg`;
+    return () => { active = false; };
+  }, [variant]);
+  useEffect(() => {
+    // The fixed guard retains this contrast even after the profile band scrolls away.
+    document.documentElement.dataset.welcome = String(hasMedia);
+    return () => { delete document.documentElement.dataset.welcome; };
+  }, [hasMedia]);
+  return <div className={`brand-image brand-${variant} ${hasMedia ? "has-media" : ""} ${className}`}>
+    <div className="status-guard" aria-hidden="true"/>{children}
+  </div>;
+}
+
+export function BrandHeader({ children, variant }: { children: ReactNode; variant: "profile" }) {
+  return <BrandSurface variant={variant} className="brand-header brand-header-profile"><div className="brand-header-content">{children}</div></BrandSurface>;
 }
