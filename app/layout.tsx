@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { NativeLaunchMoment } from "./native-launch-moment";
 import "./globals.css";
 import "./tutorial-source.css";
+import "./welcome-screen.css";
 
 export const metadata: Metadata = {
   title: "Makeup Bestie — Your artist, your hype woman",

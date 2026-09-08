@@ -9,7 +9,8 @@ import { PlacementGuide } from "./placement-guide";
 import { LiveCoach } from "./live-coach";
 import { extractTutorialFrames, extractTutorialFramesFromUrl } from "@/lib/video-frames";
 import { CreatorStudio, DiscoverFeed } from "./routine-community";
-import { AuthScreen, CloudConfigurationScreen, CloudLoadingScreen, type LaunchAccount, useLaunchAccount } from "./launch-account";
+import { CloudConfigurationScreen, CloudLoadingScreen, type LaunchAccount, useLaunchAccount } from "./launch-account";
+import { UnauthenticatedShell } from "./welcome-screen";
 import { ManageBillingButton, PricingScreen } from "./pricing-screen";
 import type { SavedLookRecord } from "@/lib/account-types";
 import {
@@ -261,7 +262,6 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const onboardingCache=readOnboardingCache(account.user?.id);
   const launchStage:LaunchStage=resolveLaunchStage({profileComplete:serverProfileComplete,subscriptionActive,peekSeen:serverProfileComplete||onboardingCache.peekSeen});
   const firstName=profileName.trim().split(/\s+/)[0]||"Bestie";
-  const createFlowActive=view==="creator";
   const homeFlowActive=["home","studio-intake","face-scan","look-brief","preview","session"].includes(view);
   const immersiveLesson=view==="session";
 
@@ -327,8 +327,6 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const onboardingView=view==="peek"||view==="onboarding"||view==="pricing";
   const nav = <>{!immersiveLesson&&!onboardingView&&<header className="nav-shell app-nav-shell"><nav className="nav app-nav"><Logo home={() => go("home")} />{profileComplete?<button className="account-chip" onClick={()=>go("profile")}><span>{firstName.charAt(0).toUpperCase()}</span><b>{firstName}</b></button>:<span className="local-profile-note">{account.configured?"Private account":"Local development profile"}</span>}</nav></header>}{!immersiveLesson&&profileComplete&&!onboardingView&&<nav className="bottom-nav" aria-label="Primary navigation">
     <button className={homeFlowActive?"active":""} onClick={()=>go("home")}><i>⌂</i><span>Home</span></button>
-    <button className={view==="discover"?"active":""} onClick={()=>go("discover")}><i>◇</i><span>Discover</span><small className="nav-soon">Soon</small></button>
-    <button className={`create-tab${createFlowActive?" active":""}`} onClick={()=>go("creator")}><i>＋</i><span>Create</span><small className="nav-soon">Soon</small></button>
     <button className={view==="profile"||view==="my-looks"?"active":""} onClick={()=>go("profile")}><i>○</i><span>Profile</span></button>
   </nav>}</>;
 
@@ -775,6 +773,6 @@ export default function App() {
   const account=useLaunchAccount();
   if(process.env.NODE_ENV==="production"&&!account.configured)return <CloudConfigurationScreen/>;
   if(account.loading)return <CloudLoadingScreen/>;
-  if(account.configured&&!account.user)return <AuthScreen/>;
+  if(account.configured&&!account.user)return <UnauthenticatedShell/>;
   return <MakeupBestieExperience account={account}/>;
 }

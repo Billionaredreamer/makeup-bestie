@@ -63,9 +63,9 @@ export function useLaunchAccount(): LaunchAccount {
   return { configured: cloudAccountsConfigured, loading, user, snapshot, refresh, saveProfile, signOut };
 }
 
-export function AuthScreen() {
+export function AuthScreen({ initialMode = "signup", onBack }: { initialMode?: "signin" | "signup"; onBack?: () => void } = {}) {
   const client = getSupabaseBrowserClient();
-  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signup");
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot">(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -102,6 +102,7 @@ export function AuthScreen() {
   return <main className="auth-screen page-enter">
     <section className="auth-editorial"><p className="eyebrow">Makeup Bestie</p><h1>Your face.<br/><em>Your routine.</em></h1><p>Turn a makeup tutorial into private, personalized placement guidance made around your features and products.</p><div><span>✦</span><small>Facial landmarks stay on your device. Photos are saved only when you choose.</small></div></section>
     <section className="auth-card">
+      {onBack&&<button className="auth-back" onClick={onBack}>← Back</button>}
       <div className="auth-mark"><span>m</span><b>makeup bestie</b></div>
       <p className="eyebrow">{mode === "signup" ? "Create your account" : mode === "signin" ? "Welcome back" : "Reset your password"}</p>
       <h2>{mode === "signup" ? "Meet your new beauty profile." : mode === "signin" ? "Your looks are waiting." : "We’ll email you a secure link."}</h2>

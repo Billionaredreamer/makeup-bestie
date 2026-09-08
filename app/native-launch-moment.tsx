@@ -22,6 +22,9 @@ export function NativeLaunchMoment() {
   useEffect(() => {
     if (!nativeIOS) return;
 
+    // The native watchdog can distinguish a mounted app from an unloaded page.
+    document.documentElement.dataset.appReady = "true";
+
     let disposed = false;
     let finishTimer = 0;
 
@@ -37,6 +40,7 @@ export function NativeLaunchMoment() {
     }));
 
     return () => {
+      delete document.documentElement.dataset.appReady;
       disposed = true;
       window.clearTimeout(finishTimer);
     };
