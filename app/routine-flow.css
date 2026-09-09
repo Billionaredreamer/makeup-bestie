@@ -25,12 +25,13 @@
 .scan-camera { position:fixed;inset:0;background:#38231D;z-index:120;color:#FFFAF4; }
 .scan-camera > video { width:100%;height:100%;object-fit:cover;transform:scaleX(-1); }
 .camera-close { position:absolute;top:calc(var(--safe-top) + 12px);left:calc(var(--safe-left) + 16px);z-index:30;border:0;border-radius:50%;width:44px;height:44px;background:rgba(56,35,29,.4);color:#FFFAF4; }
-.scan-oval { position:absolute;left:20%;top:18%;width:60%;height:48%;border:2px dashed rgba(255,250,244,.8);border-radius:50%;pointer-events:none; }
 .scan-controls { position:absolute;bottom:calc(var(--safe-bottom) + 16px);left:20px;right:20px;text-align:center;text-shadow:0 1px 5px #38231D; }
 .scan-controls p { font-size:14px; }
 .scan-shutter { width:64px;height:64px;border-radius:50%;background:#FFFAF4;border:4px solid #E8C9BD; }
 .scan-file { display:inline-block;padding:8px;background:rgba(56,35,29,.5);border-radius:12px; }
-.scan-file input { max-width:220px;display:block; }
+.scan-file { position:relative;cursor:pointer;min-height:44px; }
+.scan-file input { position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer; }
+.scan-file:focus-within { outline:2px solid #FFFAF4; }
 .minimalist-mirror.glam-room { position:fixed;inset:0;width:100%;height:100dvh;padding:0;margin:0;max-width:none; }
 .minimalist-mirror .glam-heading,.minimalist-mirror .glam-face-caption,.minimalist-mirror .animated-guide-title { display:none; }
 .minimalist-mirror .glam-grid,.minimalist-mirror .glam-face-card,.minimalist-mirror .feature-mirror-stage { position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;border-radius:0; }
@@ -73,3 +74,21 @@
 .compact-preview > .flow-actions { margin-top:0; }
 .onboarding .progress { display:none; }
 @media (prefers-reduced-motion:reduce) { .minimalist-mirror * { transition:none!important;animation:none!important; } }
+
+/* Reset both edges: legacy lesson-active rules must not anchor controls at the top. */
+.minimalist-mirror .live-coach-dock { top:auto;bottom:var(--safe-bottom);height: min(12dvh,96px);width:100%;backdrop-filter:none;pointer-events:none; }
+.minimalist-mirror .live-coach-dock button { pointer-events:auto; }
+.minimalist-mirror .coach-dot { position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:min(8dvh,64px);height:min(8dvh,64px); }
+.minimalist-mirror .mirror-toolbar { top:auto;right:auto;bottom:calc(var(--safe-bottom) + 4px);height:min(8dvh,64px);align-items:center;box-shadow:none;backdrop-filter:none;overflow:visible; }
+.minimalist-mirror .mirror-toolbar button:nth-child(-n+2) { min-height:44px;flex:0 0 44px; }
+.minimalist-mirror .mirror-product,.minimalist-mirror:has(.live-coach-dock.active) .mirror-product { bottom:calc(var(--safe-bottom) + 8dvh);height:4dvh;min-height:0;max-width:90%;padding:0;font-size:13px; }
+.minimalist-mirror .coach-hint { bottom:8dvh;height:4dvh;margin:0;line-height:4dvh; }
+.minimalist-mirror:has(.live-coach-dock.active) .mirror-product { left:8px;transform:none;max-width:40%;font-size:11px; }
+.minimalist-mirror .coach-hint { left:auto;right:8px;transform:none;width:55%;font-size:11px; }
+.minimalist-mirror .coach-controls { position:absolute;left:0;right:0;bottom:4px;height:44px;align-items:center;justify-content:space-between;gap:0;pointer-events:none; }
+.minimalist-mirror .coach-controls button { min-height:44px;padding:4px; }
+.minimalist-mirror .coach-error { bottom:8dvh;max-width:90%;padding:0;margin:0;font-size:11px; }
+.minimalist-mirror .glam-lesson-card { margin:0; }
+.minimalist-mirror .mirror-feed > video { width:100%;height:100%;object-fit:fill; }
+.minimalist-mirror .mirror-feed > video.mirrored,.minimalist-mirror .front-camera .mirror-feed > .placement-overlay { transform:scaleX(-1); }
+.minimalist-mirror .silent-mirror { background:#38231D; }
