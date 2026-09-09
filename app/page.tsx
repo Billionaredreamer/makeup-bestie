@@ -6,6 +6,7 @@ import Link from "next/link";
 import { estimateFaceProfile, placementFor, type FaceProfile, type FaceShape, type Point } from "@/lib/face-analysis";
 import { type LessonRegion, type Technique } from "@/lib/placement-map";
 import { PlacementGuide } from "./placement-guide";
+import { ScanCamera } from "./scan-camera";
 import { LiveCoach } from "./live-coach";
 import { extractTutorialFrames, extractTutorialFramesFromUrl } from "@/lib/video-frames";
 import { CreatorStudio, DiscoverFeed } from "./routine-community";
@@ -40,7 +41,7 @@ import {
   type SkinConcern,
 } from "@/lib/face-blueprint";
 
-type View = "peek" | "pricing" | "home" | "discover" | "creator" | "my-looks" | "onboarding" | "face-scan" | "studio-intake" | "look-brief" | "preview" | "session" | "import" | "profile";
+type View = "confirm-features" | "finished" | "peek" | "pricing" | "home" | "discover" | "creator" | "my-looks" | "onboarding" | "face-scan" | "studio-intake" | "look-brief" | "preview" | "session" | "import" | "profile";
 type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; areas: LessonRegion[]; technique: Technique; referenceCue: string; adaptation: string; checkpoint: string; startTimeSeconds: number; endTimeSeconds: number; uncertain: boolean; addedByBestie?: boolean };
 type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[]; analysisScope: string; steps: LessonStep[]; sourceUrl?: string; sourceVideoAnalyzed?: boolean };
 const defaultLesson: LessonStep[] = [
@@ -89,16 +90,15 @@ function BlueprintSelect({ label, value, options, onChange }: { label:string; va
 function FaceBlueprintEditor({ value, onChange }: { value:FaceBlueprint; onChange:(value:FaceBlueprint)=>void }) {
   const toggleConcern=(concern:SkinConcern)=>onChange({...value,skinConcerns:value.skinConcerns.includes(concern)?value.skinConcerns.filter(item=>item!==concern):[...value.skinConcerns,concern]});
   return <section className="face-blueprint-card">
-    <header><div><p className="eyebrow">Your Face Blueprint</p><h2>Make the estimate yours.</h2></div><span>Estimated locally · editable</span></header>
-    <p className="blueprint-intro">These feature labels refine technique and direction. Check them once and correct anything that does not sound like you.</p>
+
     <div className="blueprint-feature-grid">
-      <article><b>Eyes</b><BlueprintSelect label="Visible lid" value={value.eyes.openness} options={eyeOpennessOptions} onChange={openness=>onChange({...value,eyes:{...value.eyes,openness:openness as FaceBlueprint["eyes"]["openness"]}})}/><BlueprintSelect label="Outer direction" value={value.eyes.direction} options={eyeDirectionOptions} onChange={direction=>onChange({...value,eyes:{...value.eyes,direction:direction as FaceBlueprint["eyes"]["direction"]}})}/><BlueprintSelect label="Spacing" value={value.eyes.spacing} options={eyeSpacingOptions} onChange={spacing=>onChange({...value,eyes:{...value.eyes,spacing:spacing as FaceBlueprint["eyes"]["spacing"]}})}/></article>
-      <article><b>Brows</b><BlueprintSelect label="Natural line" value={value.brows.arch} options={browArchOptions} onChange={arch=>onChange({...value,brows:{arch:arch as FaceBlueprint["brows"]["arch"]}})}/><small>Density is not guessed from your photo.</small></article>
-      <article><b>Nose</b><BlueprintSelect label="Visible width" value={value.nose.width} options={noseWidthOptions} onChange={width=>onChange({...value,nose:{...value.nose,width:width as FaceBlueprint["nose"]["width"]}})}/><BlueprintSelect label="Visible length" value={value.nose.length} options={noseLengthOptions} onChange={length=>onChange({...value,nose:{...value.nose,length:length as FaceBlueprint["nose"]["length"]}})}/></article>
-      <article><b>Lips</b><BlueprintSelect label="Natural balance" value={value.lips.balance} options={lipBalanceOptions} onChange={balance=>onChange({...value,lips:{balance:balance as FaceBlueprint["lips"]["balance"]}})}/></article>
-      <article><b>Cheeks</b><BlueprintSelect label="Cheekbone placement" value={value.cheeks.placement} options={cheekPlacementOptions} onChange={placement=>onChange({...value,cheeks:{placement:placement as FaceBlueprint["cheeks"]["placement"]}})}/><small>You confirm this because a flat photo cannot reliably measure bone prominence.</small></article>
+      <details><summary>Eyes</summary><BlueprintSelect label="Visible lid" value={value.eyes.openness} options={eyeOpennessOptions} onChange={openness=>onChange({...value,eyes:{...value.eyes,openness:openness as FaceBlueprint["eyes"]["openness"]}})}/><BlueprintSelect label="Outer direction" value={value.eyes.direction} options={eyeDirectionOptions} onChange={direction=>onChange({...value,eyes:{...value.eyes,direction:direction as FaceBlueprint["eyes"]["direction"]}})}/><BlueprintSelect label="Spacing" value={value.eyes.spacing} options={eyeSpacingOptions} onChange={spacing=>onChange({...value,eyes:{...value.eyes,spacing:spacing as FaceBlueprint["eyes"]["spacing"]}})}/></details>
+      <details><summary>Brows</summary><BlueprintSelect label="Natural line" value={value.brows.arch} options={browArchOptions} onChange={arch=>onChange({...value,brows:{arch:arch as FaceBlueprint["brows"]["arch"]}})}/><small>Density is not inferred from your photo.</small></details>
+      <details><summary>Nose</summary><BlueprintSelect label="Visible width" value={value.nose.width} options={noseWidthOptions} onChange={width=>onChange({...value,nose:{...value.nose,width:width as FaceBlueprint["nose"]["width"]}})}/><BlueprintSelect label="Visible length" value={value.nose.length} options={noseLengthOptions} onChange={length=>onChange({...value,nose:{...value.nose,length:length as FaceBlueprint["nose"]["length"]}})}/></details>
+      <details><summary>Lips</summary><BlueprintSelect label="Natural balance" value={value.lips.balance} options={lipBalanceOptions} onChange={balance=>onChange({...value,lips:{balance:balance as FaceBlueprint["lips"]["balance"]}})}/></details>
+      <details><summary>Cheeks</summary><BlueprintSelect label="Cheekbone placement" value={value.cheeks.placement} options={cheekPlacementOptions} onChange={placement=>onChange({...value,cheeks:{placement:placement as FaceBlueprint["cheeks"]["placement"]}})}/><small>You confirm this because a flat photo cannot reliably measure bone prominence.</small></details>
     </div>
-    <div className="skin-today"><div><b>What should today’s lesson account for?</b><small>Optional · choose what you notice rather than what the camera guesses.</small></div><div>{skinConcernOptions.map(concern=><button key={concern} className={value.skinConcerns.includes(concern)?"selected":""} aria-pressed={value.skinConcerns.includes(concern)} onClick={()=>toggleConcern(concern)}>{value.skinConcerns.includes(concern)?"✓ ":"+ "}{concern}</button>)}</div></div>
+    <details className="skin-today"><summary>Skin today</summary><div><b>What should today’s lesson account for?</b><small>Optional · choose what you notice rather than what the camera guesses.</small></div><div>{skinConcernOptions.map(concern=><button key={concern} className={value.skinConcerns.includes(concern)?"selected":""} aria-pressed={value.skinConcerns.includes(concern)} onClick={()=>toggleConcern(concern)}>{value.skinConcerns.includes(concern)?"✓ ":"+ "}{concern}</button>)}</div></details>
     <p className="blueprint-honesty"><b>Beauty guidance, not a diagnosis.</b> Makeup Bestie uses these choices only to adjust placement, layering and blending.</p>
   </section>;
 }
@@ -210,6 +210,7 @@ function SneakPeek({ onFinish }: { onFinish: () => void }) {
 
 function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [view, setView] = useState<View>("peek");
+  const swipeStart=useRef<number|null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [launchResolved,setLaunchResolved]=useState(false);
   const [onboard, setOnboard] = useState(0);
@@ -217,7 +218,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [profileEmail,setProfileEmail]=useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [step, setStep] = useState(0);
-  const [profile, setProfile] = useState<FaceProfile | null>(null);
+  const [, setProfile] = useState<FaceProfile | null>(null);
   const [shape, setShape] = useState<FaceShape | null>(null);
   const [faceBlueprint, setFaceBlueprint] = useState<FaceBlueprint | null>(null);
   const [facePoints, setFacePoints] = useState<Point[]>([]);
@@ -226,12 +227,12 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [cameraFacing,setCameraFacing]=useState<"user"|"environment">("user");
   const [guideCorner,setGuideCorner]=useState<"left"|"right">("right");
   const [guideExpanded,setGuideExpanded]=useState(false);
-  const [lessonPanelOpen,setLessonPanelOpen]=useState(true);
+  const [lessonPanelOpen,setLessonPanelOpen]=useState(false);
   const [tutorialClipOpen,setTutorialClipOpen]=useState(false);
   // Blending arrows animate by default, but anyone can freeze them — and they
   // start frozen for people who have asked their system to reduce motion.
   const [guideMotion,setGuideMotion]=useState(true);
-  const [lookNotes, setLookNotes] = useState("");
+  const [lookNotes] = useState("");
   const [lookUrl, setLookUrl] = useState("");
   const [lookFile, setLookFile] = useState<File | null>(null);
   const [lookReferenceFrame, setLookReferenceFrame] = useState("");
@@ -392,7 +393,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     try{
       if(account.configured)await account.saveProfile({display_name:profileName,skin_type:answers.skin||"",skin_tone:answers.tone||"",experience:answers.level||"",makeup_goal:answers.goal||"",products:ownedProducts,face_shape:shape,face_blueprint:faceBlueprint});
       else window.localStorage.setItem("makeup-bestie-profile-v1",JSON.stringify({name:profileName,email:profileEmail,answers,faceBlueprint}));
-      go("preview");
+      go("look-brief");
     }catch{setMapMessage("Your Face Blueprint could not be saved. Please try once more.");}
   };
 
@@ -445,161 +446,11 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     return <PricingScreen account={account.snapshot!} onRefresh={account.refresh} onSignOut={account.signOut}/>;
   }
 
-  if (view === "face-scan") return <>
-    {nav}
-    <main className="simple-page page-enter">
-      <section className="launch-scan-shell">
-        <button className="back" onClick={() => go("studio-intake")}>← Back to tutorial</button>
-        <div className="launch-scan-heading">
-          <div><p className="eyebrow">Step 3 · Today’s face</p><h1>Let’s map your features.</h1><p>Now that the tutorial is understood, take one current bare-face photo. MediaPipe estimates facial proportions on this device; the image is not sent anywhere during this scan.</p></div>
-          <span className={`map-status ${mapStatus}`}>{mapStatus==="analyzing"?"Scanning…":mapStatus==="ready"?"Face map ready":mapStatus==="no-face"?"No face detected":"Photo needed"}</span>
-        </div>
-        <div className="launch-scan-grid">
-          <div className="scan-photo-card">
-            <label className="photo-capture">
-              <b>{prepPhoto?"Retake or replace photo":"Take your face scan photo"}</b>
-              <span>Face forward in soft, even light.</span>
-              <input type="file" accept="image/jpeg,image/png,image/webp" capture="user" onChange={event=>{const file=event.target.files?.[0];if(file){setPrepFile(file);setPreviewImage("");setPreviewStatus("idle");analyzePreparationPhoto(file);}}}/>
-            </label>
-            {prepPhoto&&<div className="scan-photo"><img src={prepPhoto} alt="Your private face scan"/></div>}
-            <p className={`map-message ${mapStatus}`}>{mapMessage}</p>
-            {(mapStatus==="no-face"||mapStatus==="error")&&<p className="scan-retry-note">Choose another clear, front-facing photo to continue. The face scan is required for personalization.</p>}
-          </div>
-          <aside className="scan-result-card">
-            <p className="eyebrow">Your editable estimate</p>
-            <h2>{shape?`${shape}-shaped proportions`:"Waiting for your scan"}</h2>
-            <p>This estimate helps tailor technique. It is not a judgment or permanent face classification.</p>
-            {/* The measurement behind the guess, so a wrong estimate is obvious
-                and correctable rather than presented as a verdict. */}
-            {profile&&<div className="scan-measures">
-              <div><b>{Math.round(profile.confidence*100)}%</b><small>Estimate confidence</small></div>
-              <div><b>{profile.ratios.lengthToWidth.toFixed(2)}</b><small>Length to width</small></div>
-              <div><b>{profile.ratios.foreheadToJaw.toFixed(2)}</b><small>Forehead to jaw</small></div>
-            </div>}
-            {shape&&<label className="shape-correction"><span>Correct the estimate</span><select value={shape} onChange={event=>setShape(event.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(item=><option key={item}>{item}</option>)}</select></label>}
-            <div className="scan-privacy"><b>Private by default</b><span>Landmark coordinates stay in this browser. Your account saves only the feature labels you confirm below. The photo is sent only if you separately request an AI makeup preview.</span></div>
-          </aside>
-        </div>
-        {faceBlueprint&&<FaceBlueprintEditor value={faceBlueprint} onChange={setFaceBlueprint}/>}
-        <button className="primary blueprint-continue" disabled={mapStatus!=="ready"||!faceBlueprint} onClick={()=>void continueFromFaceScan()}>Confirm my Face Blueprint →</button>
-      </section>
-    </main>
-  </>;
-
-  if (view === "studio-intake") return <>
-    {nav}
-    <main className="simple-page page-enter">
-      <section className="studio-intake-card">
-        <button className="back" onClick={() => go("home")}>← Back home</button>
-        <p className="eyebrow">Step 2 · Your inspiration</p>
-        <h1>Which tutorial are we making yours?</h1>
-        <p className="studio-lede">Paste a public tutorial link or upload a permitted video copy, then choose the makeup you already own.</p>
-        <div className="tutorial-link-box launch-link-box">
-          <label>
-            <span>Paste the original tutorial link <small>or upload below</small></span>
-            <input type="url" inputMode="url" value={lookUrl} onChange={event => { setLookUrl(event.target.value); setLessonError(""); }} placeholder="https://www.tiktok.com/..."/>
-          </label>
-          <label className="upload-zone intake-upload required-upload">
-            <span>Upload the tutorial video <small>or paste a link above</small></span>
-            <small>Only upload a video you have permission to use.</small>
-            <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event => { const file=event.target.files?.[0]||null; setLookFile(file); setTutorialVideoUrl(file?URL.createObjectURL(file):""); setLessonError(""); }}/>
-            {lookFile && <small>Attached: {lookFile.name}</small>}
-          </label>
-        </div>
-        <label className="look-notes">
-          <span>Anything you want the coach to prioritize? <small>(optional)</small></span>
-          <textarea value={lookNotes} onChange={event => setLookNotes(event.target.value)} placeholder="Example: Keep the base light and make the wing beginner-friendly."/>
-        </label>
-        <section className="product-shelf">
-          <div><p className="eyebrow">Your makeup bag</p><h2>What do you already have?</h2><p>Choose everything you own. Leave items unchecked and the lesson will suggest easy substitutes.</p></div>
-          <div className="product-options">{productOptions.map(product=><label key={product} className={ownedProducts.includes(product)?"selected":""}><input type="checkbox" checked={ownedProducts.includes(product)} onChange={event=>setOwnedProducts(event.target.checked?[...ownedProducts,product]:ownedProducts.filter(item=>item!==product))}/><span>{product}</span><b>{ownedProducts.includes(product)?"✓":"+"}</b></label>)}</div>
-        </section>
-        <p className="honest-note"><b>No pretend analysis:</b> Makeup Bestie first tries to read a public linked video. If the platform blocks access, you’ll be asked for an upload. A lesson is created only after real tutorial frames are analyzed.</p>
-        {lessonAnalyzing&&<div className="analysis-progress" role="status"><i/><span><b>Analyzing your tutorial</b><small>{lessonStage}</small></span></div>}
-        {lessonError && <p className="error">{lessonError}</p>}
-        <button className="primary intake-continue" disabled={lessonAnalyzing || (!lookUrl.trim() && !lookFile)} onClick={createBrief}>
-          {lessonAnalyzing ? "Studying every stage of the tutorial…" : "Analyze tutorial & create my lesson →"}
-        </button>
-      </section>
-    </main>
-  </>;
-  if (view === "look-brief" && brief) return <>
-    {nav}
-    <main className="simple-page page-enter">
-      <section className="brief-shell">
-        <button className="back" onClick={() => go("studio-intake")}>← Change inspiration</button>
-        <div className="brief-heading">
-          <div><p className="eyebrow">Your personalized Look Brief</p><input aria-label="Look title" value={brief.title} onChange={event => setBrief({...brief,title:event.target.value})}/><p>{brief.summary}</p></div>
-          <div className="brief-meta"><span><b>{brief.difficulty}</b> difficulty</span><span><b>{brief.time}</b> estimated</span><span><b>{brief.steps.length}</b> tutorial steps</span></div>
-        </div>
-        <div className="brief-grid">
-          <article className="brief-adaptation">
-            <small>HOW WE’LL MAKE IT YOURS</small><h2>Same energy. Your features.</h2>
-            <textarea aria-label="Personalized adaptation" value={brief.adaptation} onChange={event => setBrief({...brief,adaptation:event.target.value})}/>
-            <p className="analysis-scope"><b>What the AI reviewed:</b> {brief.analysisScope}</p>
-            {brief.sourceUrl && <div className="saved-source"><div><small>ORIGINAL TUTORIAL</small><p>Linked source saved · tutorial video analyzed</p></div><a href={brief.sourceUrl} target="_blank" rel="noopener noreferrer">Open tutorial ↗</a></div>}
-            <div className="uncertain"><b>What we’re not certain about</b><ul>{brief.uncertainties.map(item=><li key={item}>{item}</li>)}</ul></div>
-          </article>
-          <article className="product-check">
-            <small>BEFORE YOU BEGIN</small><h2>Gather your products</h2><p>Check what you have. Missing products can be skipped or substituted during the lesson.</p>
-            {brief.products.map(product=><label key={product}><input type="checkbox" checked={ownedProducts.includes(product)} onChange={event=>setOwnedProducts(event.target.checked?[...ownedProducts,product]:ownedProducts.filter(item=>item!==product))}/><span>{product}</span><small>{ownedProducts.includes(product)?"Ready":"Can substitute"}</small></label>)}
-          </article>
-        </div>
-        <section className="lesson-outline">
-          <p className="eyebrow">What your bestie learned</p><h2>The tutorial, turned into your lesson.</h2>
-          <div>{brief.steps.map((item,index)=><article key={index}><span>{String(index+1).padStart(2,"0")}</span><div><b>{item.product}</b><p>{item.referenceCue}</p><small>{areaSummary(item)}</small><p className="step-checkpoint"><b>Checkpoint:</b> {item.checkpoint}</p>{item.uncertain&&<small>Uncertain tutorial detail</small>}</div></article>)}</div>
-        </section>
-        <div className="brief-actions">
-          <button className="outline" onClick={() => go("studio-intake")}>Edit inspiration</button>
-          <button className="primary" onClick={() => go("preview")}>See the tutorial on my face →</button>
-        </div>
-      </section>
-    </main>
-  </>;
-
-  if (view === "preview" && brief) return <>
-    {nav}
-    <main className="simple-page page-enter">
-      <section className="preview-shell">
-        <button className="back" onClick={() => go("face-scan")}>← Retake today’s photo</button>
-        <div className="preview-heading">
-          <div>
-            <p className="eyebrow">Your personalized visualization</p>
-            <h1>See the look before you start.</h1>
-            <p>This is the finish your personalized placement lesson will work toward on your own face.</p>
-          </div>
-          <span>AI visualization · not a guaranteed result</span>
-        </div>
-        <div className="preview-layout">
-          <div className="preview-stage">
-            <div className="preview-column">
-              <small>YOUR STARTING PHOTO</small>
-              {prepPhoto ? <img src={prepPhoto} alt="Your private preparation photo"/> : <label className="preview-upload">
-                <b>Take or choose a bare-face photo</b>
-                <span>Face forward in soft, even light.</span>
-                <input type="file" accept="image/jpeg,image/png,image/webp" capture="user" onChange={e => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setPrepFile(file);
-                    setPreviewImage("");
-                    setPreviewStatus("idle");
-                    analyzePreparationPhoto(file);
-                  }
-                }}/>
-              </label>}
-              <p>{mapStatus === "analyzing" ? "Mapping your features privately…" : mapStatus === "ready" ? "Private facial mapping complete." : mapStatus === "no-face" ? "No face detected—try another photo." : mapStatus === "error" ? "Local mapping is unavailable on this device." : "Photo remains on this device until you request a preview."}</p>
-            </div>
-            <div className="preview-arrow">→</div>
-            <div className="preview-column result">
-              <small>PERSONALIZED PREVIEW</small>
-              {previewImage ? <div className="feature-preview"><img src={previewImage} alt="AI-generated personalized makeup preview on your face"/></div> : <div className="preview-placeholder">
-                <i>✦</i>
-                <b>{previewStatus === "generating" ? "Creating your preview…" : "Your makeup preview appears here"}</b>
-                <span>Identity-preserving makeup visualization</span>
-              </div>}
-              <p>{previewImage ? "Generated from your Look Brief and preparation photo." : "The preview changes makeup only—not your facial structure."}</p>
-            </div>
-            <div className="intensity-picker">
+  if (view === "face-scan") return <ScanCamera onBack={()=>go("studio-intake")} busy={mapStatus==="analyzing"} message={mapMessage} onPhoto={async file=>{setPrepFile(file);setPreviewImage("");setPreviewStatus("idle");await analyzePreparationPhoto(file);go("confirm-features");}}/>;
+  if(view==="confirm-features")return <main className="flow-screen"><button className="back" onClick={()=>go("face-scan")}>← Retake photo</button><h1>Make the analysis yours.</h1><p>We’ve analysed your scan. Change anything that’s off.</p>{shape&&<label>Face proportions<select value={shape} onChange={e=>setShape(e.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(item=><option key={item}>{item}</option>)}</select></label>}{faceBlueprint&&<FaceBlueprintEditor value={faceBlueprint} onChange={setFaceBlueprint}/>}<p role="status">{mapMessage}</p><button className="primary" disabled={mapStatus!=="ready"||!faceBlueprint} onClick={()=>void continueFromFaceScan()}>Confirm features →</button></main>;
+  if(view==="studio-intake"&&(lookUrl.trim()||lookFile))return <main className="flow-screen"><button className="back" disabled={lessonAnalyzing} onClick={()=>{go("home");setComposerOpen(true);}}>← Add tutorial</button><h1>Your makeup bag.</h1><p>Choose what you own. Missing products can be skipped or substituted.</p><div className="bag-chips">{productOptions.map(product=><button key={product} aria-pressed={ownedProducts.includes(product)} onClick={()=>setOwnedProducts(ownedProducts.includes(product)?ownedProducts.filter(item=>item!==product):[...ownedProducts,product])}>{product}</button>)}</div>{lessonAnalyzing&&<p role="status">Analyzing your tutorial · {lessonStage}</p>}{lessonError&&<p className="error">{lessonError}</p>}<div className="flow-actions"><button className="outline" disabled={lessonAnalyzing} onClick={createBrief}>Skip</button><button className="primary" disabled={lessonAnalyzing||(!lookUrl.trim()&&!lookFile)} onClick={createBrief}>{lessonAnalyzing?"Analyzing…":"Continue"}</button></div></main>;
+  if(view==="look-brief"&&brief)return <main className="flow-screen"><button className="back" onClick={()=>go("confirm-features")}>← Features</button><h1>Your lesson.</h1><p>Application by application · One product at a time.</p><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} applications</p><p>{brief.summary}</p><details><summary>Application order & uncertainties</summary><ol>{brief.steps.map((item,i)=><li key={i}>{item.product}{item.uncertain?" · uncertain detail":""}</li>)}</ol>{brief.uncertainties.map(item=><p key={item}>{item}</p>)}</details><button className="primary" onClick={()=>go("preview")}>Continue →</button></main>;
+  if(view==="preview"&&brief)return <main className="flow-screen compact-preview"><div className="flow-actions"><button className="back" onClick={()=>go("look-brief")}>← Your lesson</button><button className="back" disabled={previewStatus==="generating"} onClick={()=>{setStep(0);setMirrorOpen(true);setCameraFacing("user");setLessonPanelOpen(false);go("session");}}>Skip →</button></div><h1>See the look before you start.</h1><p>Optional AI visualization—not a guaranteed result.</p><div className="preview-pair">{prepPhoto&&<img src={prepPhoto} alt="Your private starting photo"/>}{previewImage?<img src={previewImage} alt="Your personalized preview"/>:<div>Your preview appears here</div>}</div><div className="intensity-picker">
               <span>Preview intensity</span>
               {(["soft", "reference", "dramatic"] as const).map(item => <button key={item} className={previewIntensity === item ? "selected" : ""} onClick={() => {
                 setPreviewIntensity(item);
@@ -607,41 +458,10 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
                 setPreviewStatus("idle");
               }}>{item === "reference" ? "Match reference" : item}</button>)}
             </div>
-            {previewError && <p className="error">{previewError}</p>}
             <label className="preview-consent"><input type="checkbox" checked={previewConsent} onChange={event=>{setPreviewConsent(event.target.checked);setPreviewError("");}}/><span><b>Generate my personalized preview</b><small>Send this one face photo to OpenAI for makeup visualization. It is not saved by Makeup Bestie.</small></span></label>
-            <button className="primary wide" disabled={!prepFile || !previewConsent || previewStatus === "generating"} onClick={generatePersonalizedPreview}>
+            <p className="preview-cost">Uses one preview from your monthly preview allowance.</p><button className="primary wide" disabled={!prepFile || !previewConsent || previewStatus === "generating"} onClick={generatePersonalizedPreview}>
               {previewStatus === "generating" ? "Generating realistic preview…" : previewImage ? "Regenerate preview" : "Generate my preview"}
-            </button>
-          </div>
-          <aside className="preview-plan face-first-plan">
-            <p className="eyebrow">Your application plan</p>
-            <h2>One product at a time.</h2>
-            <p className="face-first-copy">Your analyzed tutorial becomes one clear application queue. Each product appears once in the order you will use it, with skin preparation placed before the first complexion step.</p>
-            <div className="face-first-flow"><span><b>1</b>Analyzed tutorial</span><i>→</i><span><b>2</b>Product queue</span><i>→</i><span><b>3</b>Live guidance</span></div>
-            <div className="product-timeline"><small>YOUR ROUTINE</small>{brief.steps.map((item,index)=><div key={`${item.title}-${index}`}><b>{String(index+1).padStart(2,"0")}</b><span><strong>{item.product}</strong><small>{areaSummary(item)}</small></span></div>)}</div>
-            <div className="preview-summary">
-              <small>YOUR COACH ALREADY KNOWS</small>
-              <ul>
-                <li>{brief.title}</li>
-                <li>{brief.difficulty} · {brief.time}</li>
-                <li>{ownedProducts.length} products confirmed</li>
-                <li>{shape ? `${shape}-shaped proportion estimate` : "Facial mapping pending"}</li>
-                <li>{faceBlueprint ? "Face Blueprint confirmed" : "Feature details pending"}</li>
-              </ul>
-            </div>
-            <div className="application-queue-ready"><small>YOUR LESSON FORMAT</small><b>Application by application</b><span>Enter the Glam Room once, then use the in-mirror controls to move from product to product without leaving your camera.</span></div>
-            <div className="save-photo-option save-look-control">
-              <span><b>{saveStatus==="saved"?"Saved to My Looks":"Save this look"}</b><small>The lesson and generated preview are private. Your bare-face scan is never stored.</small></span>
-              <button className="outline" disabled={saveStatus==="saving"||saveStatus==="saved"} onClick={saveCurrentLook}>{saveStatus==="saving"?"Saving…":saveStatus==="saved"?"Saved ✓":"Save"}</button>
-            </div>
-            {saveError&&<p className="error">{saveError}</p>}
-            <button className="primary wide" disabled={!prepPhoto} onClick={() => {setStep(0);setMirrorOpen(true);setCameraFacing("user");setGuideExpanded(false);setLessonPanelOpen(false);setTutorialClipOpen(false);go("session");}}>Enter the Glam Room →</button>
-          </aside>
-        </div>
-      </section>
-    </main>
-  </>;
-
+            </button>{previewError&&<p className="error">{previewError}</p>}{previewImage&&<button className="outline" onClick={()=>{setStep(0);setMirrorOpen(true);setCameraFacing("user");setLessonPanelOpen(false);go("session");}}>Enter the Glam Room →</button>}</main>;
   if (view === "onboarding") {
     const qs = [["skin","First, your canvas","How does your skin usually feel?",["Dry or tight","Oily or shiny","A little of both","Balanced","Sensitive"]],["tone","Your complexion","Which range feels closest to you?",["Fair","Light","Medium","Tan","Deep","Rich"]],["level","Your experience","Where are you in your makeup journey?",["Just starting","I know the basics","Confident","Basically an artist"]],["goal","Your moment","What do you want to learn first?",["Everyday natural","Soft glam","Full glam","Editorial color","Copy a saved look"]]] as const;
     const finishProfile=async()=>{
@@ -659,14 +479,16 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
 
   if(view==="creator")return <>{nav}<CreatorStudio onCancel={()=>go("home")}/></>;
 
+  if(view==="finished")return <main className="flow-screen finished-screen"><span aria-hidden="true">✓</span><h1>That’s the look.</h1><p>{activeLesson.length} applications, start to finish.</p><button className="primary" disabled={saveStatus==="saving"||saveStatus==="saved"} onClick={saveCurrentLook}>{saveStatus==="saved"?"Saved ✓":saveStatus==="saving"?"Saving…":"Save this look"}</button><button className="back" onClick={()=>go("home")}>{saveStatus==="saved"?"Back home":"Not this time"}</button><p>Saving keeps the lesson. Your scan is never stored.</p>{saveError&&<p className="error">{saveError}</p>}</main>;
   if (view === "session") {
     const placement = shape ? placementFor(shape) : null;
     const placementKey = currentLesson.technique as keyof ReturnType<typeof placementFor>;
     const personalizedPlacement = placement?.[placementKey] || currentLesson.adaptation;
     const blueprintPlacement = blueprintTechniqueNote(faceBlueprint,currentLesson.technique);
     const moveToStep = (nextStep:number) => {
+      if(nextStep>=activeLesson.length){setMirrorOpen(false);go("finished");return;}
       const target = Math.max(0,Math.min(activeLesson.length-1,nextStep));
-      setStep(target);setTutorialClipOpen(false);
+      setStep(target);setTutorialClipOpen(false);setLessonPanelOpen(false);
     };
     const personalizedGuide=(compact=false)=><div className={`glam-face${compact?" compact-guide":""}`} style={{aspectRatio:String(photoAspect)}}>
       <img src={prepPhoto} alt="Your face with a personalized makeup placement guide"/>
@@ -677,7 +499,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     </div>;
     return <>
       {nav}
-      <main className="glam-room page-enter lesson-active">
+      <main className="glam-room lesson-active minimalist-mirror" onTouchStart={e=>{if(!(e.target as HTMLElement).closest("button,aside,.live-coach-dock"))swipeStart.current=e.touches[0].clientY;}} onTouchEnd={e=>{if(swipeStart.current===null)return;const dy=e.changedTouches[0].clientY-swipeStart.current;swipeStart.current=null;if(Math.abs(dy)>70)moveToStep(step+(dy<0?1:-1));}}><button className="camera-close" onClick={()=>{setMirrorOpen(false);go("home");}} aria-label="Close Glam Room">✕</button><span className="mirror-count">{step+1} of {activeLesson.length}</span>
         <div className="glam-heading">
           <div><p className="eyebrow">The Glam Room · Application {step+1} of {activeLesson.length}</p><h1>{brief?.title || "Your personalized lesson"}</h1><p>{mirrorOpen?"Your live mirror is open. Move through the product queue here and turn on the coach whenever you want to talk.":"Your camera is paused. The personalized placement guide and full product queue are still available."}</p></div>
           <div className={`offline-pill${mirrorOpen?" active":""}`}><i/> {mirrorOpen?"Private camera active":"Camera paused"}</div>
@@ -702,9 +524,9 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
                 skinTone:answers.tone||"Not supplied",
                 experience:answers.level||"Not supplied",
               }}/>
-              <div className="mirror-toolbar" aria-label="Mirror controls">
+              <button className="mirror-product" onClick={()=>setLessonPanelOpen(true)}>{currentLesson.product} ⓘ</button><div className="mirror-toolbar" aria-label="Mirror controls">
                 <button disabled={step===0} onClick={()=>moveToStep(step-1)}><span>←</span>Previous</button>
-                {step===activeLesson.length-1?<button className="next-application" onClick={()=>{setMirrorOpen(false);go("preview");}}><span>✓</span>Finish look</button>:<button className="next-application" onClick={()=>moveToStep(step+1)}><span>→</span>Next product</button>}
+                {step===activeLesson.length-1?<button className="next-application" onClick={()=>{setMirrorOpen(false);go("finished");}}><span>✓</span>Finish look</button>:<button className="next-application" onClick={()=>moveToStep(step+1)}><span>→</span>Next product</button>}
                 <button aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}><span>{guideMotion?"Ⅱ":"▶"}</span>{guideMotion?"Pause arrows":"Play arrows"}</button>
                 <button onClick={()=>setGuideCorner(value=>value==="right"?"left":"right")}><span>⇄</span>Move guide</button>
                 <button aria-pressed={guideExpanded} onClick={()=>setGuideExpanded(value=>!value)}><span>{guideExpanded?"↙":"↗"}</span>{guideExpanded?"Shrink guide":"Expand guide"}</button>
@@ -714,9 +536,10 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
             </div>:personalizedGuide()}
             <div className="glam-face-caption"><span>{mirrorOpen?"Live mirror · on-device tracking":"Camera paused · scanned-face guide"}</span><b>{currentLesson.product} · {areaSummary(currentLesson)}</b></div>
           </section>
-          <aside className={`glam-lesson-card${lessonPanelOpen?" panel-open":" panel-closed"}`}>
+          <aside onTouchStart={e=>{swipeStart.current=e.touches[0].clientY;}} onTouchEnd={e=>{if(swipeStart.current!==null&&e.changedTouches[0].clientY-swipeStart.current>60)setLessonPanelOpen(false);swipeStart.current=null;}} className={`glam-lesson-card${lessonPanelOpen?" panel-open":" panel-closed"}`}>
             <button className="lesson-panel-handle" aria-expanded={lessonPanelOpen} onClick={()=>setLessonPanelOpen(value=>!value)}><span/><b>{currentLesson.product} · Step {step+1}</b><small>{lessonPanelOpen?"Hide":"Details"}</small></button>
             <div className="lesson-panel-content">
+              <div className="sheet-tools"><button className="outline" onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Pause arrows":"Animate arrows"}</button><button className="outline" onClick={()=>setCameraFacing(value=>value==="user"?"environment":"user")}>Flip camera</button><button className="outline" onClick={()=>setMirrorOpen(value=>!value)}>{mirrorOpen?"Stop camera":"Restart camera"}</button></div>
               <div className="lesson-progress"><span>Application queue</span><span>Step {step+1} of {activeLesson.length}</span></div>
               <div className="dots">{activeLesson.map((_,index)=><i key={index} className={index<=step?"active":""}/>)}</div>
               <p className="eyebrow">Now we’re using</p><h2>{currentLesson.product}</h2>
@@ -731,7 +554,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
               {!mirrorOpen&&<div className="mirror-option"><div><b>Live mirror paused</b><span>Restart it whenever you are ready. Landmarks stay on this device; no camera frames are uploaded.</span></div><button className="outline" onClick={()=>setMirrorOpen(true)}>Restart live mirror</button></div>}
               <div className="glam-actions">
                 <button className="outline" disabled={step===0} onClick={()=>moveToStep(step-1)}>← Previous</button>
-                {step===activeLesson.length-1?<button className="primary" onClick={()=>{setMirrorOpen(false);go("preview");}}>Finish look ✓</button>:<button className="primary" onClick={()=>moveToStep(step+1)}>Done—next product →</button>}
+                {step===activeLesson.length-1?<button className="primary" onClick={()=>{setMirrorOpen(false);go("finished");}}>Finish look ✓</button>:<button className="primary" onClick={()=>moveToStep(step+1)}>Done—next product →</button>}
               </div>
             </div>
           </aside>
@@ -772,7 +595,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     </main></>;
   }
 
-  if (composerOpen) return <main className="composer-sheet"><div className="status-guard" aria-hidden="true"/><div className="composer-sheet-content"><button className="auth-back" onClick={()=>setComposerOpen(false)}>← Back to Home</button><section className="routine-composer"><div className="composer-heading"><span>＋</span><div><small>CREATE A PERSONALIZED LESSON</small><h2>Drop the routine here.</h2></div></div><p className="home-intro">Bring the tutorial first. We’ll study it before asking for today’s face photo.</p><label className="dashboard-link"><span>↗</span><input type="url" inputMode="url" value={lookUrl} onChange={event=>{setLookUrl(event.target.value);setLessonError("");}} placeholder="Paste a TikTok, Instagram, YouTube, or public video link"/></label><div className="composer-divider"><span>or</span></div><label className="dashboard-upload"><span>▶</span><div><b>{lookFile?lookFile.name:"Upload the tutorial video"}</b><small>MP4, WebM, or MOV · only content you can use</small></div><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event=>{const file=event.target.files?.[0]||null;setLookFile(file);setTutorialVideoUrl(file?URL.createObjectURL(file):"");setLessonError("");}}/></label><button className="primary composer-continue" disabled={!lookUrl.trim()&&!lookFile} onClick={()=>{setComposerOpen(false);go("studio-intake");}}>Continue with this routine →</button></section><section className="dashboard-steps"><article><span>01</span><b>We study the tutorial</b><p>Real frames, product order, and technique.</p></article><article><span>02</span><b>You take today’s photo</b><p>Local face mapping adapts the routine.</p></article><article><span>03</span><b>You enter the Glam Room</b><p>Application-by-application guidance on a large live mirror.</p></article></section></div></main>;
+  if (composerOpen||view==="studio-intake") return <main className="composer-sheet"><div className="status-guard" aria-hidden="true"/><div className="composer-sheet-content"><button className="auth-back" onClick={()=>{setComposerOpen(false);go("home");}}>← Back to Home</button><section className="routine-composer"><div className="composer-heading"><span>＋</span><div><small>CREATE A PERSONALIZED LESSON</small><h2>Drop the routine here.</h2></div></div><p className="home-intro">Bring the tutorial first. We’ll study it before asking for today’s face photo.</p><label className="dashboard-link"><span>↗</span><input type="url" inputMode="url" value={lookUrl} onChange={event=>{setLookUrl(event.target.value);setLessonError("");}} placeholder="Paste a TikTok, Instagram, YouTube, or public video link"/></label><div className="composer-divider"><span>or</span></div><label className="dashboard-upload"><span>▶</span><div><b>{lookFile?lookFile.name:"Upload the tutorial video"}</b><small>MP4, WebM, or MOV · only content you can use</small></div><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event=>{const file=event.target.files?.[0]||null;setLookFile(file);setTutorialVideoUrl(file?URL.createObjectURL(file):"");setLessonError("");}}/></label><button className="primary composer-continue" disabled={!lookUrl.trim()&&!lookFile} onClick={()=>{setComposerOpen(false);go("studio-intake");}}>Continue with this routine →</button></section><section className="dashboard-steps" hidden><article><span>01</span><b>We study the tutorial</b><p>Real frames, product order, and technique.</p></article><article><span>02</span><b>You take today’s photo</b><p>Local face mapping adapts the routine.</p></article><article><span>03</span><b>You enter the Glam Room</b><p>Application-by-application guidance on a large live mirror.</p></article></section></div></main>;
   return <>{nav}<BrandSurface variant="home" className="home-poster"><main className="home-poster-content"><p className="poster-greeting">Hello {firstName},</p><h1>What routine do you have in mind?</h1>{brief&&<section className="continue-card"><div><small>CONTINUE WHERE YOU LEFT OFF</small><h2>{brief.title}</h2><p>{mapStatus==="ready"?"Your personalized preview and application queue are ready.":"Tutorial analyzed · today’s face photo is next."}</p></div><button className="outline" onClick={()=>go(mapStatus==="ready"?"preview":"face-scan")}>Continue →</button></section>}<button className="primary poster-start" onClick={()=>setComposerOpen(true)}>Start a routine</button></main></BrandSurface></>;
 }
 

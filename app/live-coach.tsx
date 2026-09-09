@@ -174,16 +174,10 @@ export function LiveCoach({ context }: { context: LiveCoachContext }) {
   const active = !["off", "error"].includes(status);
 
   return <div className={`live-coach-dock ${active ? "active" : ""} status-${status}`}>
-    <audio ref={audioRef} autoPlay aria-hidden="true" />
-    {!active ? <button className="coach-start" onClick={() => void start()}><span>✦</span><b>Live coach</b><small>{status === "error" ? "Try again" : "Tap to talk"}</small></button> : <>
-      <div className="coach-status"><i/><span><b>{statusCopy[status]}</b><small>Voice only · camera stays private</small></span></div>
-      <div className="coach-controls">
-        <button aria-pressed={muted} onClick={toggleMute}><span>{muted ? "○" : "●"}</span>{muted ? "Unmute" : "Mute"}</button>
-        <button aria-pressed={status === "paused"} onClick={togglePause}><span>{status === "paused" ? "▶" : "Ⅱ"}</span>{status === "paused" ? "Resume" : "Pause"}</button>
-        <button onClick={repeat}><span>↻</span>Repeat</button>
-        <button className="coach-end" onClick={stop}><span>×</span>End</button>
-      </div>
-    </>}
-    {error && <p className="coach-error">{error}</p>}
+    <audio ref={audioRef} autoPlay aria-hidden="true"/>
+    <button className="coach-dot" aria-label={!active?"Start live coach":status==="paused"?"Resume coach":"Pause coach"} aria-busy={status==="requesting"||status==="connecting"} onClick={()=>{if(active)togglePause();else void start();}}/>
+    <span className="sr-only" role="status">{statusCopy[status]}</span>
+    {active&&<><p className="coach-hint">Ask anything about this step</p><div className="coach-controls"><button aria-pressed={muted} onClick={toggleMute}>{muted?"Unmute":"Mute"}</button><button className="coach-end" onClick={stop}>End</button><button className="sr-only" onClick={repeat}>Repeat instruction</button></div></>}
+    {error&&<p className="coach-error" role="alert">{error}</p>}
   </div>;
 }

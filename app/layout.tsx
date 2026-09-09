@@ -3,6 +3,7 @@ import { NativeLaunchMoment } from "./native-launch-moment";
 import "./globals.css";
 import "./tutorial-source.css";
 import "./welcome-screen.css";
+import "./routine-flow.css";
 
 export const metadata: Metadata = {
   title: "Makeup Bestie — Your artist, your hype woman",
