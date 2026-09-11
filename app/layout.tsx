@@ -4,6 +4,7 @@ import "./globals.css";
 import "./tutorial-source.css";
 import "./welcome-screen.css";
 import "./routine-flow.css";
+import "./launch-polish.css";
 
 export const metadata: Metadata = {
   title: "Makeup Bestie — Your artist, your hype woman",

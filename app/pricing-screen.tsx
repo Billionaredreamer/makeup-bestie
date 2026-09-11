@@ -15,6 +15,7 @@ async function readBillingPayload(response: Response): Promise<BillingPayload> {
 }
 
 export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnapshot;onRefresh:()=>Promise<void>;onSignOut:()=>Promise<void>}) {
+  const [selectedPlan,setSelectedPlan]=useState<SubscriptionPlan>("plus");
   const [busy,setBusy]=useState<SubscriptionPlan|null>(null);
   const [error,setError]=useState("");
   const [confirming,setConfirming]=useState(false);
@@ -61,18 +62,32 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
     catch(caught){setError(caught instanceof Error?caught.message:"Restore could not be completed.");}
     finally{setRestoring(false);}
   };
-  return <main className="pricing-screen page-enter">
-    <header className="pricing-header"><div className="auth-mark"><span>m</span><b>makeup bestie</b></div><button onClick={onSignOut}>Sign out</button></header>
-    <section className="pricing-intro"><p className="eyebrow">Your beauty profile is ready</p><h1>Choose how often we<br/><em>make a look yours.</em></h1><p>Start with the plan that fits your routine. Your private beauty profile, saved lessons, and preferences stay with you on either plan.</p></section>
-    <section className="pricing-grid">
-      <article className="featured recommended-plan"><div className="plan-ribbon">RECOMMENDED</div><small>MAKEUP BESTIE PLUS</small><h2><b>$12.99</b><span>/ month</span></h2><p>Everything most beauty lovers need to learn new looks.</p><div className="plan-allowance"><b>15</b><span>tutorial adaptations<br/>each month</span></div><ul><li>One personalized preview per adaptation</li><li>Private saved looks and beauty profile</li><li>Unlimited lesson replays and Glam Room use</li></ul><button className="primary" disabled={Boolean(busy)||confirming} onClick={()=>checkout("plus")}>{busy==="plus"?(nativeIOS?"Opening the App Store…":"Opening checkout…"):"Choose Plus →"}</button><small className="plan-reassurance">Cancel anytime in Settings</small></article>
-      <article className="unlimited-plan"><small>MAKEUP BESTIE UNLIMITED</small><h2><b>$49.99</b><span>/ month</span></h2><p>For beauty lovers creating and practicing constantly.</p><div className="plan-allowance"><b>∞</b><span>routine adaptations<br/>for personal use</span></div><ul><li>One personalized preview per adaptation</li><li>Private saved looks and beauty profile</li><li>Reasonable anti-automation protection only</li></ul><button className="outline" disabled={Boolean(busy)||confirming} onClick={()=>checkout("unlimited")}>{busy==="unlimited"?(nativeIOS?"Opening the App Store…":"Opening checkout…"):"Choose Unlimited →"}</button><small className="plan-reassurance">Cancel anytime in Settings</small></article>
-    </section>
-    {confirming&&<p className="pricing-confirming">Payment received. We’re securely activating your plan…</p>}
-    {error&&<p className="pricing-error">{error}</p>}
-    {nativeIOS
-      ? <p className="pricing-footnote">Purchases are billed through your Apple ID. Already subscribed on another device? <button className="link" disabled={restoring} onClick={restore}>{restoring?"Restoring…":"Restore purchases"}</button> Your current usage: {account.usage.tutorialAnalyses} tutorial adaptations this month.</p>
-      : <p className="pricing-footnote">Secure checkout is provided by Stripe. Makeup Bestie never receives or stores your card number. Your current usage: {account.usage.tutorialAnalyses} tutorial adaptations this month.</p>}
+  const unavailable=Boolean(busy)||confirming||restoring;
+  return <main className="launch-paywall">
+    <div className="paywall-content">
+      <header className="paywall-top"><span className="paywall-mark" aria-hidden="true">m</span><button className="paywall-close" onClick={onSignOut} disabled={unavailable} aria-label="Close and sign out" title="Close and sign out">×</button></header>
+      <h1>Unlock your <em>bestie.</em></h1>
+      <ul className="paywall-benefits">
+        <li><span aria-hidden="true">✦</span>Any tutorial, rebuilt for your face</li>
+        <li><span aria-hidden="true">✦</span>Step-by-step in the Glam Room, with placement guides</li>
+        <li><span aria-hidden="true">✦</span>Your bestie on voice, hands-free</li>
+      </ul>
+      <fieldset className="paywall-plans" disabled={unavailable}>
+        <legend className="sr-only">Choose your monthly plan</legend>
+        <label className={selectedPlan==="plus"?"selected":""}><input type="radio" name="plan" value="plus" checked={selectedPlan==="plus"} onChange={()=>setSelectedPlan("plus")}/><span><b>Plus</b><small>15 adaptations / month</small></span><span className="paywall-price"><b>$12.99</b><small>/month</small></span></label>
+        <label className={selectedPlan==="unlimited"?"selected":""}><input type="radio" name="plan" value="unlimited" checked={selectedPlan==="unlimited"} onChange={()=>setSelectedPlan("unlimited")}/><span><b>Unlimited</b><small>No monthly limit · personal use</small></span><span className="paywall-price"><b>$49.99</b><small>/month</small></span></label>
+      </fieldset>
+      <footer className="paywall-bottom">
+        {confirming&&<p className="paywall-message" role="status">Payment received. We’re securely activating your plan…</p>}
+        {error&&<p className="paywall-message" role="alert">{error}</p>}
+        <button className="primary paywall-subscribe" disabled={unavailable} onClick={()=>checkout(selectedPlan)}>{busy?(nativeIOS?"Opening the App Store…":"Opening checkout…"):"Subscribe"}</button>
+        <p className="paywall-renewal">Renews monthly until cancelled. {nativeIOS?"Billed through your Apple ID. Cancel anytime in Settings → Apple ID → Subscriptions.":"Cancel anytime from Profile → Manage subscription."}</p>
+        <nav className="paywall-legal" aria-label="Subscription information">
+          {nativeIOS&&<button disabled={unavailable} onClick={restore}>{restoring?"Restoring…":"Restore purchases"}</button>}
+          <a href="/terms">Terms</a><a href="/privacy">Privacy</a>
+        </nav>
+      </footer>
+    </div>
   </main>;
 }
 
