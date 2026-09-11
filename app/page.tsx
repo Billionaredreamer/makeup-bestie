@@ -16,6 +16,7 @@ import { UnauthenticatedShell } from "./welcome-screen";
 import { BrandHeader, BrandSurface } from "./brand-header";
 import { ManageBillingButton, PricingScreen } from "./pricing-screen";
 import type { SavedLookRecord } from "@/lib/account-types";
+import { clearGuestProfileDraft, guestProfileIsComplete, readGuestProfileDraft } from "@/lib/guest-onboarding";
 import {
   profileRecordIsComplete,
   readOnboardingCache,
@@ -257,6 +258,8 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [saveStatus,setSaveStatus]=useState<"idle"|"saving"|"saved"|"error">("idle");
   const [saveError,setSaveError]=useState("");
   const lastHydratedUserId=useRef<string|null>(null);
+  const guestMergeUserId=useRef<string|null>(null);
+  const mergeGuestProfile=account.saveProfile;
   const fullLesson = brief?.steps?.length ? brief.steps : defaultLesson;
   const activeLesson = fullLesson;
   const currentLesson = activeLesson[Math.min(step, activeLesson.length - 1)];
@@ -287,11 +290,24 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     const shouldChooseInitialView=Boolean(cloudUserId&&lastHydratedUserId.current!==cloudUserId);
     if(cloudUserId)lastHydratedUserId.current=cloudUserId;
     if(cloudProfile){
-      writeOnboardingCache(cloudUserId,{peekSeen:true,profileComplete:true});
-      const next=resolveLaunchStage({profileComplete:true,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:true});
+      const cloudComplete=profileRecordIsComplete(cloudProfile);
+      clearGuestProfileDraft();
+      writeOnboardingCache(cloudUserId,{peekSeen:true,profileComplete:cloudComplete});
+      const next=resolveLaunchStage({profileComplete:cloudComplete,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:true});
       queueMicrotask(()=>{setProfileName(cloudProfile.display_name);setProfileEmail(account.snapshot?.user.email||"");setAnswers({skin:cloudProfile.skin_type,tone:cloudProfile.skin_tone,level:cloudProfile.experience,goal:cloudProfile.makeup_goal});setOwnedProducts(cloudProfile.products||[]);if(cloudProfile.face_shape)setShape(cloudProfile.face_shape as FaceShape);setFaceBlueprint(normalizeFaceBlueprint(cloudProfile.face_blueprint));if(shouldChooseInitialView)setView(next);setLaunchResolved(true);});return;
     }
     if(account.configured&&account.user){
+      const guestDraft=readGuestProfileDraft();
+      if(guestProfileIsComplete(guestDraft)&&guestMergeUserId.current!==cloudUserId){
+        guestMergeUserId.current=cloudUserId;
+        const displayName=guestDraft.name?.trim()||String(account.user.user_metadata?.display_name||"").trim()||account.user.email?.split("@")[0]||"Bestie";
+        queueMicrotask(()=>{
+          setProfileName(displayName);setProfileEmail(account.user?.email||"");setAnswers({skin:guestDraft.skin||"",tone:guestDraft.tone||"",level:guestDraft.level||"",goal:guestDraft.goal||""});setOwnedProducts(guestDraft.products||[]);setLaunchResolved(false);
+          void mergeGuestProfile({display_name:displayName,skin_type:guestDraft.skin||"",skin_tone:guestDraft.tone||"",experience:guestDraft.level||"",makeup_goal:guestDraft.goal||"",products:guestDraft.products||[],face_shape:null,face_blueprint:null}).then(()=>{clearGuestProfileDraft();writeOnboardingCache(cloudUserId,{peekSeen:true,profileComplete:true});setView(resolveLaunchStage({profileComplete:true,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:true}));setLaunchResolved(true);}).catch(()=>{guestMergeUserId.current=null;setView("onboarding");setLaunchResolved(true);});
+        });
+        return;
+      }
+      if(guestProfileIsComplete(guestDraft)&&guestMergeUserId.current===cloudUserId)return;
       let localName=String(account.user.user_metadata?.display_name||"");let localAnswers:Record<string,string>={};
       let localBlueprint:FaceBlueprint|null=null;let localProducts:string[]=[];
       try{const saved=window.localStorage.getItem("makeup-bestie-profile-v1");if(saved){const parsed=JSON.parse(saved) as {name?:string;answers?:Record<string,string>;products?:string[];faceBlueprint?:unknown};localName=parsed.name||localName;localAnswers=parsed.answers||{};localProducts=parsed.products||[];localBlueprint=normalizeFaceBlueprint(parsed.faceBlueprint);}}catch{/* Start with a clean cloud profile. */}
@@ -309,7 +325,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       if(localComplete)writeOnboardingCache(null,{peekSeen:true,profileComplete:true});
       queueMicrotask(()=>{setProfileName(parsed.name||"");setProfileEmail(parsed.email||"");setAnswers(parsed.answers||{});setOwnedProducts(parsed.products||[]);setFaceBlueprint(normalizeFaceBlueprint(parsed.faceBlueprint));setView(localComplete?"home":cached.peekSeen?"onboarding":"peek");setLaunchResolved(true);});
     } catch { queueMicrotask(()=>{setView("peek");setLaunchResolved(true);}); }
-  },[account.configured,account.snapshot,account.user]);
+  },[account.configured,account.snapshot,account.user,mergeGuestProfile]);
   useEffect(()=>{
     if(view==="pricing"&&launchStage!=="pricing")queueMicrotask(()=>setView(launchStage));
   },[launchStage,view]);

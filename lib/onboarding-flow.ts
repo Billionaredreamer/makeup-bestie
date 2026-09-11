@@ -2,6 +2,7 @@ import type { BeautyProfileRecord, SubscriptionRecord } from "./account-types";
 
 export type PaywallPosition = "before-personalization" | "after-personalization";
 export type LaunchStage = "peek" | "onboarding" | "pricing" | "home";
+export type GuestLaunchStage = "peek" | "onboarding" | "starting-profile" | "auth";
 
 // This is deliberately the only switch that controls where the paywall sits.
 export const PAYWALL_POSITION: PaywallPosition = "after-personalization";
@@ -50,17 +51,28 @@ export function subscriptionRecordIsActive(subscription?: SubscriptionRecord | n
   return Boolean(subscription && ["active", "trialing"].includes(subscription.status));
 }
 
+type LaunchStageInput = {
+  profileComplete: boolean;
+  subscriptionActive: boolean;
+  peekSeen: boolean;
+  startingProfileSeen?: boolean;
+};
+
+export function resolveLaunchStage(input:LaunchStageInput&{authenticated:false}):GuestLaunchStage;
+export function resolveLaunchStage(input:LaunchStageInput&{authenticated?:true}):LaunchStage;
 export function resolveLaunchStage({
   profileComplete,
   subscriptionActive,
   peekSeen,
-}: {
-  profileComplete: boolean;
-  subscriptionActive: boolean;
-  peekSeen: boolean;
-}): LaunchStage {
+  authenticated = true,
+  startingProfileSeen = false,
+}: LaunchStageInput&{authenticated?:boolean}): LaunchStage|GuestLaunchStage {
+  if(!authenticated){
+    if(!peekSeen)return "peek";
+    if(!profileComplete)return "onboarding";
+    return startingProfileSeen?"auth":"starting-profile";
+  }
   if (profileComplete && subscriptionActive) return "home";
-  if (!profileComplete && !peekSeen) return "peek";
   if (!subscriptionActive && PAYWALL_POSITION === "before-personalization") return "pricing";
   if (!profileComplete) return "onboarding";
   return "pricing";

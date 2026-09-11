@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { AccountSnapshot, BeautyProfileRecord } from "@/lib/account-types";
 import { cloudAccountsConfigured, getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { clearOnboardingCache } from "@/lib/onboarding-flow";
+import { clearGuestProfileDraft, readGuestProfileDraft, writeGuestProfileDraft } from "@/lib/guest-onboarding";
 
 export type LaunchAccount = {
   configured: boolean;
@@ -56,6 +57,7 @@ export function useLaunchAccount(): LaunchAccount {
     const currentUserId = user?.id;
     await getSupabaseBrowserClient()?.auth.signOut();
     clearOnboardingCache(currentUserId);
+    clearGuestProfileDraft();
     window.localStorage.removeItem("makeup-bestie-profile-v1");
     setSnapshot(null); setUser(null);
   }, [user?.id]);
@@ -66,7 +68,8 @@ export function useLaunchAccount(): LaunchAccount {
 export function AuthScreen({ initialMode = "signup", onBack }: { initialMode?: "signin" | "signup"; onBack?: () => void } = {}) {
   const client = getSupabaseBrowserClient();
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">(initialMode);
-  const [name, setName] = useState("");
+  const [emailOpen,setEmailOpen]=useState(false);
+  const [name, setName] = useState(()=>readGuestProfileDraft().name||"");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -84,6 +87,7 @@ export function AuthScreen({ initialMode = "signup", onBack }: { initialMode?: "
       } else if (mode === "signup") {
         if (name.trim().length < 2) throw new Error("Tell your bestie what to call you.");
         if (password.length < 8) throw new Error("Use at least 8 characters for your password.");
+        writeGuestProfileDraft({name:name.trim()});
         const { data, error: authError } = await client.auth.signUp({
           email, password,
           options: { emailRedirectTo: `${window.location.origin}/auth/callback`, data: { display_name: name.trim() } },
@@ -99,23 +103,34 @@ export function AuthScreen({ initialMode = "signup", onBack }: { initialMode?: "
     } finally { setBusy(false); }
   };
 
-  return <main className="auth-screen page-enter">
-    <section className="auth-editorial"><p className="eyebrow">Makeup Bestie</p><h1>Your face.<br/><em>Your routine.</em></h1><p>Turn a makeup tutorial into private, personalized placement guidance made around your features and products.</p><div><span>✦</span><small>Facial landmarks stay on your device. Photos are saved only when you choose.</small></div></section>
-    <section className="auth-card">
-      {onBack&&<button className="auth-back" onClick={onBack}>← Back</button>}
-      <div className="auth-mark"><span>m</span><b>makeup bestie</b></div>
-      <p className="eyebrow">{mode === "signup" ? "Create your account" : mode === "signin" ? "Welcome back" : "Reset your password"}</p>
-      <h2>{mode === "signup" ? "Meet your new beauty profile." : mode === "signin" ? "Your looks are waiting." : "We’ll email you a secure link."}</h2>
-      {mode === "signup"&&<label><span>Your name</span><input autoComplete="name" value={name} onChange={event=>setName(event.target.value)} placeholder="What should your bestie call you?"/></label>}
-      <label><span>Email</span><input type="email" autoComplete="email" value={email} onChange={event=>setEmail(event.target.value)} placeholder="you@example.com"/></label>
-      {mode !== "forgot"&&<label><span>Password</span><input type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} value={password} onChange={event=>setPassword(event.target.value)} placeholder="At least 8 characters"/></label>}
-      {error&&<p className="auth-error">{error}</p>}{message&&<p className="auth-message">{message}</p>}
-      <button className="primary wide" disabled={busy||!email||((mode!=="forgot")&&!password)} onClick={submit}>{busy?"One moment…":mode==="signup"?"Create my account →":mode==="signin"?"Sign in →":"Send reset link →"}</button>
-      <div className="auth-switch">
-        {mode!=="signin"&&<button onClick={()=>{setMode("signin");setError("");setMessage("");}}>Already have an account? Sign in</button>}
-        {mode!=="signup"&&<button onClick={()=>{setMode("signup");setError("");setMessage("");}}>New here? Create an account</button>}
-        {mode==="signin"&&<button onClick={()=>{setMode("forgot");setError("");setMessage("");}}>Forgot password?</button>}
-      </div>
+  const switchMode=(next:"signin"|"signup"|"forgot")=>{setMode(next);setError("");setMessage("");setEmailOpen(next==="forgot");};
+  const emailForm=<>
+    {mode==="signup"&&<label><span>Your name</span><input autoComplete="name" value={name} onChange={event=>setName(event.target.value)} placeholder="What should your bestie call you?"/></label>}
+    <label><span>Email</span><input type="email" autoComplete="email" value={email} onChange={event=>setEmail(event.target.value)} placeholder="you@example.com"/></label>
+    {mode!=="forgot"&&<label><span>Password</span><input type="password" autoComplete={mode==="signup"?"new-password":"current-password"} value={password} onChange={event=>setPassword(event.target.value)} placeholder="At least 8 characters"/></label>}
+    {error&&<p className="auth-error">{error}</p>}{message&&<p className="auth-message">{message}</p>}
+    <button className="primary wide" disabled={busy||!email||((mode!=="forgot")&&!password)} onClick={submit}>{busy?"One moment…":mode==="signup"?"Create my account →":mode==="signin"?"Sign in →":"Send reset link →"}</button>
+    <div className="auth-switch">
+      {mode!=="signin"&&<button onClick={()=>switchMode("signin")}>Already have an account? Sign in</button>}
+      {mode!=="signup"&&<button onClick={()=>switchMode("signup")}>New here? Create an account</button>}
+      {mode==="signin"&&<button onClick={()=>switchMode("forgot")}>Forgot password?</button>}
+    </div>
+  </>;
+  return <main className="auth-choice-screen page-enter">
+    <section className="auth-choice-card">
+      {onBack&&<button className="auth-back" onClick={emailOpen?()=>{setEmailOpen(false);setMode(initialMode);setError("");setMessage("");}:onBack}>← Back</button>}
+      <div className="auth-choice-brand"><span>m</span><b>makeup bestie</b></div>
+      <h1>{mode==="forgot"?"Reset your password.":"Makeup steps made for your features."}</h1>
+      <p>{mode==="forgot"?"We’ll email you a secure link.":"Save your answers and start your first lesson."}</p>
+      {emailOpen||mode==="forgot"?<div className="auth-email-form">{emailForm}</div>:<>
+        <div className="auth-provider-list">
+          <button className="auth-provider apple" disabled aria-describedby="social-setup"><span aria-hidden="true">●</span>Continue with Apple</button>
+          <button className="auth-provider google" disabled aria-describedby="social-setup"><span aria-hidden="true">G</span>Continue with Google</button>
+          <button className="auth-provider email" onClick={()=>setEmailOpen(true)}>Continue with email</button>
+        </div>
+        <small id="social-setup" className="provider-setup">Apple and Google sign-in are being connected.</small>
+        <button className="auth-existing" onClick={()=>{setMode(initialMode==="signin"?"signup":"signin");setEmailOpen(true);}}>{initialMode==="signin"?"New here? Create an account":"Already have an account? Sign in"}</button>
+      </>}
       <small className="auth-legal">By continuing, you agree to the <Link href="/terms">Terms</Link> and acknowledge the <Link href="/privacy">Privacy Policy</Link>.</small>
     </section>
   </main>;
