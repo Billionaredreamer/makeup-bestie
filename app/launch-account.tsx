@@ -7,6 +7,7 @@ import type { AccountSnapshot, BeautyProfileRecord } from "@/lib/account-types";
 import { cloudAccountsConfigured, getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { clearOnboardingCache } from "@/lib/onboarding-flow";
 import { clearGuestProfileDraft, readGuestProfileDraft, writeGuestProfileDraft } from "@/lib/guest-onboarding";
+import { signInWithSocialProvider, SocialAuthCancelledError, type SocialProvider } from "@/lib/social-auth";
 
 export type LaunchAccount = {
   configured: boolean;
@@ -73,6 +74,7 @@ export function AuthScreen({ initialMode = "signup", onBack }: { initialMode?: "
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [socialBusy, setSocialBusy] = useState<SocialProvider | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -104,6 +106,13 @@ export function AuthScreen({ initialMode = "signup", onBack }: { initialMode?: "
   };
 
   const switchMode=(next:"signin"|"signup"|"forgot")=>{setMode(next);setError("");setMessage("");setEmailOpen(next==="forgot");};
+  const socialSignIn=async(provider:SocialProvider)=>{
+    if(!client)return;
+    setSocialBusy(provider);setError("");setMessage("");
+    try{await signInWithSocialProvider(client,provider);}
+    catch(caught){if(!(caught instanceof SocialAuthCancelledError))setError(caught instanceof Error?caught.message:`${provider==="apple"?"Apple":"Google"} sign-in failed. Please try again.`);}
+    finally{setSocialBusy(null);}
+  };
   const emailForm=<>
     {mode==="signup"&&<label><span>Your name</span><input autoComplete="name" value={name} onChange={event=>setName(event.target.value)} placeholder="What should your bestie call you?"/></label>}
     <label><span>Email</span><input type="email" autoComplete="email" value={email} onChange={event=>setEmail(event.target.value)} placeholder="you@example.com"/></label>
@@ -124,17 +133,20 @@ export function AuthScreen({ initialMode = "signup", onBack }: { initialMode?: "
       <p>{mode==="forgot"?"We’ll email you a secure link.":"Save your answers and start your first lesson."}</p>
       {emailOpen||mode==="forgot"?<div className="auth-email-form">{emailForm}</div>:<>
         <div className="auth-provider-list">
-          <button className="auth-provider apple" disabled aria-describedby="social-setup"><span aria-hidden="true">●</span>Continue with Apple</button>
-          <button className="auth-provider google" disabled aria-describedby="social-setup"><span aria-hidden="true">G</span>Continue with Google</button>
-          <button className="auth-provider email" onClick={()=>setEmailOpen(true)}>Continue with email</button>
+          <button className="auth-provider apple" disabled={Boolean(socialBusy)} onClick={()=>void socialSignIn("apple")}><AppleMark/>{socialBusy==="apple"?"Connecting to Apple…":"Continue with Apple"}</button>
+          <button className="auth-provider google" disabled={Boolean(socialBusy)} onClick={()=>void socialSignIn("google")}><GoogleMark/>{socialBusy==="google"?"Connecting to Google…":"Continue with Google"}</button>
+          <button className="auth-provider email" disabled={Boolean(socialBusy)} onClick={()=>setEmailOpen(true)}>Continue with email</button>
         </div>
-        <small id="social-setup" className="provider-setup">Apple and Google sign-in are being connected.</small>
+        {error&&<p className="auth-error provider-error">{error}</p>}
         <button className="auth-existing" onClick={()=>{setMode(initialMode==="signin"?"signup":"signin");setEmailOpen(true);}}>{initialMode==="signin"?"New here? Create an account":"Already have an account? Sign in"}</button>
       </>}
       <small className="auth-legal">By continuing, you agree to the <Link href="/terms">Terms</Link> and acknowledge the <Link href="/privacy">Privacy Policy</Link>.</small>
     </section>
   </main>;
 }
+
+function AppleMark(){return <svg className="provider-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.05 12.54c-.02-2.25 1.84-3.34 1.93-3.39a4.15 4.15 0 0 0-3.27-1.77c-1.38-.15-2.72.83-3.42.83-.72 0-1.8-.82-2.97-.79a4.35 4.35 0 0 0-3.66 2.23c-1.59 2.75-.4 6.8 1.12 9.02.76 1.09 1.65 2.3 2.82 2.26 1.14-.05 1.57-.73 2.94-.73 1.36 0 1.77.73 2.96.7 1.23-.02 2-1.09 2.73-2.19a8.91 8.91 0 0 0 1.25-2.55 3.92 3.92 0 0 1-2.43-3.62ZM14.8 5.91a4 4 0 0 0 .92-2.87 4.08 4.08 0 0 0-2.64 1.36 3.82 3.82 0 0 0-.95 2.76 3.37 3.37 0 0 0 2.67-1.25Z"/></svg>}
+function GoogleMark(){return <svg className="provider-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.56 12.23c0-.71-.06-1.4-.18-2.05H12v3.87h5.36a4.58 4.58 0 0 1-1.99 3v2.51h3.23c1.89-1.74 2.96-4.3 2.96-7.33Z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.61-2.44l-3.23-2.51c-.9.6-2.04.95-3.38.95-2.6 0-4.81-1.76-5.6-4.13H3.06v2.59A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 13.87A6 6 0 0 1 6.09 12c0-.65.11-1.28.31-1.87V7.54H3.06A10 10 0 0 0 2 12c0 1.61.39 3.13 1.06 4.46l3.34-2.59Z"/><path fill="#EA4335" d="M12 6c1.47 0 2.79.51 3.83 1.5l2.87-2.87A9.64 9.64 0 0 0 12 2a10 10 0 0 0-8.94 5.54l3.34 2.59C7.19 7.76 9.4 6 12 6Z"/></svg>}
 
 export function CloudLoadingScreen() {
   return <main className="cloud-loading"><span>m</span><b>Opening your Makeup Bestie…</b></main>;
