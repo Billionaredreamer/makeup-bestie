@@ -32,6 +32,19 @@ export function writeOnboardingCache(userId: string | null | undefined, value: P
   window.localStorage.setItem(cacheKey(userId), JSON.stringify({ ...current, ...value }));
 }
 
+export function migrateLocalOnboardingCache(userId: string): OnboardingCache {
+  const accountCache = readOnboardingCache(userId);
+  if (typeof window === "undefined") return accountCache;
+  const localCache = readOnboardingCache(null);
+  const migrated = {
+    peekSeen: accountCache.peekSeen || localCache.peekSeen,
+    profileComplete: accountCache.profileComplete || localCache.profileComplete,
+  };
+  window.localStorage.setItem(cacheKey(userId), JSON.stringify(migrated));
+  window.localStorage.removeItem(cacheKey(null));
+  return migrated;
+}
+
 export function clearOnboardingCache(userId?: string | null) {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(cacheKey(userId));
@@ -73,6 +86,7 @@ export function resolveLaunchStage({
     return startingProfileSeen?"auth":"starting-profile";
   }
   if (profileComplete && subscriptionActive) return "home";
+  if (!peekSeen) return "peek";
   if (!subscriptionActive && PAYWALL_POSITION === "before-personalization") return "pricing";
   if (!profileComplete) return "onboarding";
   return "pricing";

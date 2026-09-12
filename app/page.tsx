@@ -14,11 +14,13 @@ import { CreatorStudio, DiscoverFeed } from "./routine-community";
 import { CloudConfigurationScreen, CloudLoadingScreen, type LaunchAccount, useLaunchAccount } from "./launch-account";
 import { UnauthenticatedShell } from "./welcome-screen";
 import { BrandHeader, BrandSurface } from "./brand-header";
+import { SneakPeek } from "./sneak-peek";
 import { ManageBillingButton, PricingScreen } from "./pricing-screen";
 import type { SavedLookRecord } from "@/lib/account-types";
 import { clearGuestProfileDraft, guestProfileIsComplete, readGuestProfileDraft } from "@/lib/guest-onboarding";
 import {
   profileRecordIsComplete,
+  migrateLocalOnboardingCache,
   readOnboardingCache,
   resolveLaunchStage,
   subscriptionRecordIsActive,
@@ -181,35 +183,6 @@ function SilentMirror({ areas, technique, shape, blueprint, stepNumber, paused, 
 
 function Logo({ home }: { home: () => void }) { return <button className="logo" onClick={home}><span>m</span> makeup bestie</button>; }
 
-const peekPanels = [
-  { number:"01", icon:"↗", eyebrow:"Tutorial to technique", title:"A real routine, remade for you.", copy:"Bring a tutorial you love. Makeup Bestie studies the actual steps and keeps the creator’s product order while adapting technique to your face." },
-  { number:"02", icon:"◎", eyebrow:"Private face mapping", title:"Your face stays yours.", copy:"Your feature map is created on your device. Bare-face photos and live camera footage are not saved unless you deliberately choose to save a finished look." },
-  { number:"03", icon:"✦", eyebrow:"The Glam Room", title:"Practice one product at a time.", copy:"Use a full-screen mirror, animated placement arrows, the original tutorial cues, and an optional live coach while you apply each product." },
-] as const;
-
-function SneakPeek({ onFinish }: { onFinish: () => void }) {
-  const [panel,setPanel]=useState(0);
-  const track=useRef<HTMLDivElement>(null);
-  const move=(next:number)=>{
-    const target=Math.max(0,Math.min(peekPanels.length-1,next));
-    track.current?.scrollTo({left:target*track.current.clientWidth,behavior:"smooth"});
-    setPanel(target);
-  };
-  return <main className="peek-screen page-enter">
-    <header className="peek-header"><div className="auth-mark"><span>m</span><b>makeup bestie</b></div><button onClick={onFinish}>Skip</button></header>
-    <div className="peek-track" ref={track} onScroll={event=>{const width=event.currentTarget.clientWidth;if(width)setPanel(Math.round(event.currentTarget.scrollLeft/width));}}>
-      {peekPanels.map(item=><section className="peek-panel" key={item.number}>
-        <div className="peek-visual" aria-hidden="true"><span>{item.icon}</span><i>{item.number}</i><div/><div/></div>
-        <div className="peek-copy"><p className="eyebrow">{item.eyebrow}</p><h1>{item.title}</h1><p>{item.copy}</p></div>
-      </section>)}
-    </div>
-    <footer className="peek-controls">
-      <div className="peek-dots" aria-label="Introduction progress">{peekPanels.map((item,index)=><button key={item.number} className={index===panel?"active":""} aria-label={`Show introduction ${index+1}`} onClick={()=>move(index)}/>)}</div>
-      <button className="primary" onClick={()=>panel===peekPanels.length-1?onFinish():move(panel+1)}>{panel===peekPanels.length-1?"Personalize my bestie →":"Continue →"}</button>
-    </footer>
-  </main>;
-}
-
 function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [view, setView] = useState<View>("peek");
   const swipeStart=useRef<number|null>(null);
@@ -267,7 +240,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const serverProfileComplete=account.configured?profileRecordIsComplete(account.snapshot?.profile):profileComplete;
   const subscriptionActive=subscriptionRecordIsActive(account.snapshot?.subscription);
   const onboardingCache=readOnboardingCache(account.user?.id);
-  const launchStage:LaunchStage=resolveLaunchStage({profileComplete:serverProfileComplete,subscriptionActive,peekSeen:serverProfileComplete||onboardingCache.peekSeen});
+  const launchStage:LaunchStage=resolveLaunchStage({profileComplete:serverProfileComplete,subscriptionActive,peekSeen:onboardingCache.peekSeen});
   const firstName=profileName.trim().split(/\s+/)[0]||"Bestie";
   const homeFlowActive=["home","studio-intake","face-scan","look-brief","session"].includes(view);
   const immersiveLesson=view==="session";
@@ -289,11 +262,12 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     const cloudUserId=account.user?.id||null;
     const shouldChooseInitialView=Boolean(cloudUserId&&lastHydratedUserId.current!==cloudUserId);
     if(cloudUserId)lastHydratedUserId.current=cloudUserId;
+    const migratedCache=cloudUserId?migrateLocalOnboardingCache(cloudUserId):null;
     if(cloudProfile){
       const cloudComplete=profileRecordIsComplete(cloudProfile);
       clearGuestProfileDraft();
-      writeOnboardingCache(cloudUserId,{peekSeen:true,profileComplete:cloudComplete});
-      const next=resolveLaunchStage({profileComplete:cloudComplete,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:true});
+      writeOnboardingCache(cloudUserId,{profileComplete:cloudComplete});
+      const next=resolveLaunchStage({profileComplete:cloudComplete,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:migratedCache?.peekSeen||false});
       queueMicrotask(()=>{setProfileName(cloudProfile.display_name);setProfileEmail(account.snapshot?.user.email||"");setAnswers({skin:cloudProfile.skin_type,tone:cloudProfile.skin_tone,level:cloudProfile.experience,goal:cloudProfile.makeup_goal});setOwnedProducts(cloudProfile.products||[]);if(cloudProfile.face_shape)setShape(cloudProfile.face_shape as FaceShape);setFaceBlueprint(normalizeFaceBlueprint(cloudProfile.face_blueprint));if(shouldChooseInitialView)setView(next);setLaunchResolved(true);});return;
     }
     if(account.configured&&account.user){
@@ -303,7 +277,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
         const displayName=guestDraft.name?.trim()||String(account.user.user_metadata?.display_name||"").trim()||account.user.email?.split("@")[0]||"Bestie";
         queueMicrotask(()=>{
           setProfileName(displayName);setProfileEmail(account.user?.email||"");setAnswers({skin:guestDraft.skin||"",tone:guestDraft.tone||"",level:guestDraft.level||"",goal:guestDraft.goal||""});setOwnedProducts(guestDraft.products||[]);setLaunchResolved(false);
-          void mergeGuestProfile({display_name:displayName,skin_type:guestDraft.skin||"",skin_tone:guestDraft.tone||"",experience:guestDraft.level||"",makeup_goal:guestDraft.goal||"",products:guestDraft.products||[],face_shape:null,face_blueprint:null}).then(()=>{clearGuestProfileDraft();writeOnboardingCache(cloudUserId,{peekSeen:true,profileComplete:true});setView(resolveLaunchStage({profileComplete:true,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:true}));setLaunchResolved(true);}).catch(()=>{guestMergeUserId.current=null;setView("onboarding");setLaunchResolved(true);});
+          void mergeGuestProfile({display_name:displayName,skin_type:guestDraft.skin||"",skin_tone:guestDraft.tone||"",experience:guestDraft.level||"",makeup_goal:guestDraft.goal||"",products:guestDraft.products||[],face_shape:null,face_blueprint:null}).then(()=>{clearGuestProfileDraft();writeOnboardingCache(cloudUserId,{profileComplete:true});setView(resolveLaunchStage({profileComplete:true,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:migratedCache?.peekSeen||false}));setLaunchResolved(true);}).catch(()=>{guestMergeUserId.current=null;setView("onboarding");setLaunchResolved(true);});
         });
         return;
       }
@@ -311,9 +285,8 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       let localName=String(account.user.user_metadata?.display_name||"");let localAnswers:Record<string,string>={};
       let localBlueprint:FaceBlueprint|null=null;let localProducts:string[]=[];
       try{const saved=window.localStorage.getItem("makeup-bestie-profile-v1");if(saved){const parsed=JSON.parse(saved) as {name?:string;answers?:Record<string,string>;products?:string[];faceBlueprint?:unknown};localName=parsed.name||localName;localAnswers=parsed.answers||{};localProducts=parsed.products||[];localBlueprint=normalizeFaceBlueprint(parsed.faceBlueprint);}}catch{/* Start with a clean cloud profile. */}
-      const cached=readOnboardingCache(cloudUserId);
       writeOnboardingCache(cloudUserId,{profileComplete:false});
-      const next=resolveLaunchStage({profileComplete:false,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:cached.peekSeen});
+      const next=resolveLaunchStage({profileComplete:false,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:migratedCache?.peekSeen||false});
       queueMicrotask(()=>{setProfileName(localName);setProfileEmail(account.user?.email||"");setAnswers(localAnswers);setOwnedProducts(localProducts);setFaceBlueprint(localBlueprint);if(shouldChooseInitialView)setView(next);setLaunchResolved(true);});return;
     }
     if(!account.configured)try {
