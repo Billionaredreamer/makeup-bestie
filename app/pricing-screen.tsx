@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AccountSnapshot, SubscriptionPlan } from "@/lib/account-types";
 import { isNativeIOSApp } from "@/lib/platform";
 import { configureRevenueCat, purchasePlan, restorePurchases } from "@/lib/revenuecat";
@@ -21,6 +21,11 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
   const [confirming,setConfirming]=useState(false);
   const [restoring,setRestoring]=useState(false);
   const nativeIOS=isNativeIOSApp();
+  // Set to false when this screen unmounts, which is exactly what happens the
+  // moment the subscription goes active. The Apple poll below uses it both as
+  // its success signal and to avoid setting state after unmount.
+  const mounted=useRef(true);
+  useEffect(()=>()=>{mounted.current=false;},[]);
   useEffect(()=>{
     if(!nativeIOS)return;
     configureRevenueCat(account.user.id).catch((caught)=>{setError(caught instanceof Error?caught.message:"Could not connect to the App Store.");});
@@ -43,9 +48,24 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
     try{
       const activePlan=await purchasePlan(plan);
       if(!activePlan)throw new Error("The purchase did not complete. Please try again.");
-      await onRefresh();
+      // Apple confirms the purchase on the device immediately, but entitlement
+      // is granted server-side by the RevenueCat webhook, so the subscriptions
+      // row can lag by several seconds. Refreshing once raced that webhook and
+      // left the buyer sitting on the paywall with no error and no way out.
+      // Poll on the same schedule the Stripe path already uses.
+      setConfirming(true);
+      for(let attempt=0;attempt<10&&mounted.current;attempt+=1){
+        await onRefresh();
+        if(!mounted.current)return;
+        await new Promise(resolve=>{window.setTimeout(resolve,1500);});
+      }
+      if(!mounted.current)return;
+      setConfirming(false);
+      setError("Your purchase went through, but activating your plan is taking longer than expected. Tap Restore purchases in a moment — you will not be charged twice.");
       setBusy(null);
     }catch(caught){
+      if(!mounted.current)return;
+      setConfirming(false);
       const message=caught instanceof Error?caught.message:"";
       if(!/cancel/i.test(message))setError(message||"Purchase could not be completed.");
       setBusy(null);
