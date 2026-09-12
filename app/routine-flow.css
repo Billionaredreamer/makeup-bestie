@@ -52,12 +52,16 @@
 .scan-file:focus-within { outline:2px solid #FFFAF4; }
 .minimalist-mirror.glam-room { position:fixed;inset:0;width:100%;height:100dvh;padding:0;margin:0;max-width:none; }
 .minimalist-mirror .glam-heading,.minimalist-mirror .glam-face-caption,.minimalist-mirror .animated-guide-title { display:none; }
-.minimalist-mirror .glam-grid,.minimalist-mirror .glam-face-card,.minimalist-mirror .feature-mirror-stage { position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;border-radius:0; }
+.minimalist-mirror .glam-grid,.minimalist-mirror .glam-face-card,.minimalist-mirror .feature-mirror-stage,.minimalist-mirror .glam-face:not(.compact-guide) { position:absolute;inset:0;width:100%;height:100%;max-height:none;margin:0;padding:0;border:0;border-radius:0; }
+.minimalist-mirror .glam-face:not(.compact-guide) > img { width:100%;height:100%;object-fit:cover; }
+.glam-mode-badge { position:absolute;left:58px;top:calc(var(--safe-top) + 22px);z-index:30;padding:7px 10px;border-radius:99px;background:rgba(56,35,29,.55);color:#fffaf4;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;backdrop-filter:blur(8px); }
 .mirror-count { position:absolute;right:20px;top:calc(var(--safe-top) + 24px);z-index:30;color:#FFFAF4;text-shadow:0 1px 4px #38231D; }
 .minimalist-mirror .animated-guide-pip { top:calc(var(--safe-top) + 70px);bottom:auto;width:100px;max-height:160px; }
-.minimalist-mirror .mirror-toolbar { position:absolute;bottom:calc(var(--safe-bottom) + 30px);left:50%;transform:translateX(-50%);width:240px;display:flex;justify-content:space-between;padding:0;background:none;border:0;z-index:24; }
+.minimalist-mirror .mirror-toolbar { position:absolute;bottom:calc(var(--safe-bottom) + 30px);left:50%;transform:translateX(-50%);width:min(76vw,290px);display:flex;justify-content:space-between;padding:0;background:none;border:0;z-index:24; }
 .minimalist-mirror .mirror-toolbar button { display:none; }
 .minimalist-mirror .mirror-toolbar button:nth-child(-n+2) { display:block;width:44px;min-width:44px;height:44px;padding:0;border-radius:50%;background:rgba(56,35,29,.4);color:#FFFAF4;font-size:0; }
+.minimalist-mirror .mirror-toolbar .stop-camera { display:block;width:auto;min-width:84px;height:44px;padding:0 12px;border-radius:99px;background:rgba(56,35,29,.58);color:#fffaf4;font-size:9px; }
+.minimalist-mirror .mirror-toolbar .stop-camera span { margin-right:5px; }
 .minimalist-mirror .mirror-toolbar button span { font-size:22px; }
 .mirror-product { position:absolute;bottom:calc(var(--safe-bottom) + 106px);left:50%;transform:translateX(-50%);z-index:26;max-width:90%;background:none;border:0;color:#FFFAF4;text-shadow:0 1px 5px #38231D;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:36px; }
 .minimalist-mirror .live-coach-dock { position:absolute;bottom:calc(var(--safe-bottom) + 8px);left:50%;right:auto;transform:translateX(-50%);z-index:25;width:160px;padding:0;background:none;border:0;box-shadow:none;text-align:center; }
@@ -68,10 +72,13 @@
 .minimalist-mirror .coach-controls { display:flex;justify-content:center;gap:8px;height:28px;background:none; }
 .minimalist-mirror .coach-controls button { min-height:28px;background:none;border:0;color:#FFFAF4;padding:4px 8px;font-size:12px;text-shadow:0 1px 5px #38231D; }
 .minimalist-mirror .coach-error { position:absolute;bottom:100%;width:260px;left:50%;transform:translateX(-50%);background:#38231Ddd;color:#FFFAF4;padding:8px;border-radius:8px; }
-.minimalist-mirror .glam-lesson-card { position:absolute;top:auto;bottom:0;left:0;right:0;width:100%;max-height:50dvh;height:auto;z-index:40;overflow:auto;border-radius:18px 18px 0 0;background:#FFFAF4; }
-.minimalist-mirror .glam-lesson-card.panel-closed { display:none; }
+.minimalist-mirror .glam-lesson-card { position:absolute;top:auto;bottom:var(--safe-bottom);left:0;right:0;width:100%;max-height:50dvh;height:auto;z-index:40;overflow:auto;border-radius:18px 18px 0 0;background:#FFFAF4; }
+.minimalist-mirror .glam-lesson-card.panel-closed { display:block;left:50%;right:auto;bottom:calc(var(--safe-bottom) + 72px);width:min(72vw,300px);transform:translateX(-50%);overflow:hidden;border-radius:18px; }
+.minimalist-mirror:has(.feature-mirror-stage) .glam-lesson-card.panel-closed { display:none; }
+.minimalist-mirror .glam-lesson-card.panel-closed .lesson-panel-content { display:none; }
 .minimalist-mirror .lesson-panel-content { max-height:none;overflow:visible; }
 .minimalist-mirror .lesson-panel-handle { position:sticky;top:0;min-height:44px;background:#FFFAF4; }
+.minimalist-mirror .lesson-panel-handle { display:grid; }
 .minimalist-mirror .lesson-progress,.minimalist-mirror .dots,.minimalist-mirror .finished-mini { display:none; }
 .sr-only { position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip-path:inset(50%); }
 .compact-preview { gap:12px; }
@@ -107,6 +114,17 @@
 .minimalist-mirror .coach-controls button { min-height:44px;padding:4px; }
 .minimalist-mirror .coach-error { bottom:8dvh;max-width:90%;padding:0;margin:0;font-size:11px; }
 .minimalist-mirror .glam-lesson-card { margin:0; }
-.minimalist-mirror .mirror-feed > video { width:100%;height:100%;object-fit:fill; }
+.minimalist-mirror .mirror-feed { position:absolute;inset:0;width:100%;height:100%;overflow:hidden; }
+.minimalist-mirror .mirror-feed > video { width:100%;height:100%;object-fit:cover; }
 .minimalist-mirror .mirror-feed > video.mirrored,.minimalist-mirror .front-camera .mirror-feed > .placement-overlay { transform:scaleX(-1); }
 .minimalist-mirror .silent-mirror { background:#38231D; }
+.minimalist-mirror .guide-motion-toggle { top:calc(var(--safe-top) + 64px);right:14px; }
+.minimalist-mirror .placement-key { bottom:calc(var(--safe-bottom) + 130px); }
+.slide-controls { position:absolute;z-index:32;left:50%;bottom:calc(var(--safe-bottom) + 18px);display:flex;align-items:center;gap:8px;transform:translateX(-50%); }
+.slide-controls button { min-width:46px;height:46px;border:1px solid rgba(255,255,255,.32);border-radius:50%;background:rgba(56,35,29,.66);color:#fffaf4;font-size:20px;backdrop-filter:blur(10px); }
+.slide-controls button:disabled { opacity:.35; }
+.slide-controls .slide-step { display:grid;place-items:center;min-width:78px;border-radius:99px;font-size:12px;font-weight:800;line-height:1; }
+.slide-controls .slide-step small { margin-top:2px;font-size:8px;text-transform:uppercase;letter-spacing:.08em; }
+.slide-controls .slide-switch { display:grid;place-items:center;min-width:58px;border-radius:99px;font-size:13px; }
+.slide-controls .slide-switch span { font-size:8px;text-transform:uppercase; }
+.minimalist-mirror:has(.glam-lesson-card.panel-open) .slide-controls { opacity:0;pointer-events:none; }

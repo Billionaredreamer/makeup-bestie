@@ -60,8 +60,15 @@ export function profileRecordIsComplete(profile?: BeautyProfileRecord | null) {
   );
 }
 
-export function subscriptionRecordIsActive(subscription?: SubscriptionRecord | null) {
-  return Boolean(subscription && ["active", "trialing"].includes(subscription.status));
+export function profilePreferencesAreComplete(profile?: BeautyProfileRecord | null) {
+  return Boolean(profile?.skin_type && profile.skin_tone && profile.experience && profile.makeup_goal);
+}
+
+export function subscriptionRecordIsActive(subscription?: Pick<SubscriptionRecord, "status" | "current_period_end"> | null) {
+  if (!subscription || !["active", "trialing"].includes(subscription.status)) return false;
+  if (!subscription.current_period_end) return true;
+  const periodEnd = new Date(subscription.current_period_end).getTime();
+  return Number.isFinite(periodEnd) && periodEnd + 60 * 60 * 1000 > Date.now();
 }
 
 type LaunchStageInput = {
@@ -87,8 +94,7 @@ export function resolveLaunchStage({
     return "auth";
   }
   if (profileComplete && subscriptionActive) return "home";
-  if (!peekSeen) return "peek";
-  if (!subscriptionActive && PAYWALL_POSITION === "before-personalization") return "pricing";
   if (!profileComplete) return "onboarding";
+  if (!peekSeen) return "peek";
   return "pricing";
 }

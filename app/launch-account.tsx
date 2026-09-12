@@ -5,7 +5,6 @@ import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import type { AccountSnapshot, BeautyProfileRecord } from "@/lib/account-types";
 import { cloudAccountsConfigured, getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { clearOnboardingCache } from "@/lib/onboarding-flow";
 import { clearGuestProfileDraft, readGuestProfileDraft, writeGuestProfileDraft } from "@/lib/guest-onboarding";
 import { signInWithSocialProvider, SocialAuthCancelledError, type SocialProvider } from "@/lib/social-auth";
 
@@ -14,7 +13,8 @@ export type LaunchAccount = {
   loading: boolean;
   user: User | null;
   snapshot: AccountSnapshot | null;
-  refresh: () => Promise<void>;
+  error: string;
+  refresh: () => Promise<AccountSnapshot | null>;
   saveProfile: (profile: Partial<BeautyProfileRecord>) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -23,23 +23,34 @@ export function useLaunchAccount(): LaunchAccount {
   const [loading, setLoading] = useState(cloudAccountsConfigured);
   const [user, setUser] = useState<User | null>(null);
   const [snapshot, setSnapshot] = useState<AccountSnapshot | null>(null);
+  const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
-    if (!cloudAccountsConfigured) return;
+    if (!cloudAccountsConfigured) return null;
     const client = getSupabaseBrowserClient();
     const { data } = await client!.auth.getUser();
-    setUser(data.user);
-    if (!data.user) { setSnapshot(null); setLoading(false); return; }
-    const response = await fetch("/api/account", { cache: "no-store" });
-    if (response.ok) setSnapshot(await response.json());
-    setLoading(false);
+    if (!data.user) { setUser(null); setSnapshot(null); setError(""); setLoading(false); return null; }
+    try {
+      const response = await fetch("/api/account", { cache: "no-store", signal: AbortSignal.timeout(15_000) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Your account could not be loaded.");
+      const next = result as AccountSnapshot;
+      // Commit the user and snapshot together so routing never sees a signed-in
+      // user paired with an empty profile/subscription snapshot.
+      setSnapshot(next); setUser(data.user); setError(""); setLoading(false);
+      return next;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Your account could not be loaded.");
+      setLoading(false);
+      throw caught;
+    }
   }, []);
 
   useEffect(() => {
     if (!cloudAccountsConfigured) return;
-    queueMicrotask(() => { void refresh(); });
+    queueMicrotask(() => { void refresh().catch(() => undefined); });
     const client = getSupabaseBrowserClient();
-    const { data } = client!.auth.onAuthStateChange(() => { void refresh(); });
+    const { data } = client!.auth.onAuthStateChange(() => { void refresh().catch(() => undefined); });
     return () => data.subscription.unsubscribe();
   }, [refresh]);
 
@@ -48,6 +59,7 @@ export function useLaunchAccount(): LaunchAccount {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(profile),
+      signal: AbortSignal.timeout(15_000),
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || "Your profile could not be saved.");
@@ -55,15 +67,13 @@ export function useLaunchAccount(): LaunchAccount {
   }, [refresh]);
 
   const signOut = useCallback(async () => {
-    const currentUserId = user?.id;
     await getSupabaseBrowserClient()?.auth.signOut();
-    clearOnboardingCache(currentUserId);
     clearGuestProfileDraft();
     window.localStorage.removeItem("makeup-bestie-profile-v1");
     setSnapshot(null); setUser(null);
-  }, [user?.id]);
+  }, []);
 
-  return { configured: cloudAccountsConfigured, loading, user, snapshot, refresh, saveProfile, signOut };
+  return { configured: cloudAccountsConfigured, loading, user, snapshot, error, refresh, saveProfile, signOut };
 }
 
 export function AuthScreen({ initialMode = "signup", onBack }: { initialMode?: "signin" | "signup"; onBack?: () => void } = {}) {
@@ -127,7 +137,7 @@ export function AuthScreen({ initialMode = "signup", onBack }: { initialMode?: "
   </>;
   return <main className="auth-choice-screen page-enter">
     <section className="auth-choice-card">
-      {onBack&&<button className="auth-back" onClick={emailOpen?()=>{setEmailOpen(false);setMode(initialMode);setError("");setMessage("");}:onBack}>← Back</button>}
+      {onBack&&!message&&<button className="auth-back" onClick={emailOpen?()=>{setEmailOpen(false);setMode(initialMode);setError("");setMessage("");}:onBack}>← Back</button>}
       <div className="auth-choice-brand"><span>m</span><b>makeup bestie</b></div>
       <h1>{mode==="forgot"?"Reset your password.":"Makeup steps made for your features."}</h1>
       <p>{mode==="forgot"?"We’ll email you a secure link.":"Save your answers and start your first lesson."}</p>
@@ -150,6 +160,10 @@ function GoogleMark(){return <svg className="provider-mark" viewBox="0 0 24 24" 
 
 export function CloudLoadingScreen() {
   return <main className="cloud-loading"><span>m</span><b>Opening your Makeup Bestie…</b></main>;
+}
+
+export function CloudAccountErrorScreen({ onRetry }: { onRetry: () => void }) {
+  return <main className="cloud-loading configuration"><span>m</span><b>We couldn’t open your account.</b><p>Check your connection and try again. Your answers are still here.</p><button className="primary" onClick={onRetry}>Try again</button></main>;
 }
 
 export function CloudConfigurationScreen() {

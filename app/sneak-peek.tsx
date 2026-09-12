@@ -49,7 +49,7 @@ export function SneakPeek({ onFinish }: { onFinish: () => void }) {
     </div>
     <footer className="peek-controls">
       <div className="peek-dots" aria-label="Introduction progress">{peekPanels.map((item,index)=><button key={item.number} className={index===panel?"active":""} aria-label={`Show introduction ${index+1}`} onClick={()=>move(index)}/>)}</div>
-      <button className="primary" onClick={()=>panel===peekPanels.length-1?onFinish():move(panel+1)}>{panel===peekPanels.length-1?"Personalize my bestie →":"Continue →"}</button>
+      <button className="primary" onClick={()=>panel===peekPanels.length-1?onFinish():move(panel+1)}>{panel===peekPanels.length-1?"Continue to sign up →":"Continue →"}</button>
     </footer>
   </main>;
 }

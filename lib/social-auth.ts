@@ -38,12 +38,16 @@ async function nativeSignIn(client: SupabaseClient, provider: SocialProvider) {
       mode: "online",
     },
     apple: {
-      clientId: "com.makeupbestie.app.signin",
       redirectUrl: "",
     },
   });
 
   if (provider === "google") {
+    console.info("Makeup Bestie native Google configuration", {
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      iOSClientId: GOOGLE_IOS_CLIENT_ID,
+      iOSServerClientId: GOOGLE_WEB_CLIENT_ID,
+    });
     const response = await SocialLogin.login({
       provider: "google",
       options: { scopes: ["email", "profile"], nonce: nonceDigest, forcePrompt: true },

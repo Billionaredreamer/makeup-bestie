@@ -11,7 +11,7 @@ import { PrepCard } from "./prep-card";
 import { LiveCoach } from "./live-coach";
 import { extractTutorialFrames, extractTutorialFramesFromUrl } from "@/lib/video-frames";
 import { CreatorStudio, DiscoverFeed } from "./routine-community";
-import { CloudConfigurationScreen, CloudLoadingScreen, type LaunchAccount, useLaunchAccount } from "./launch-account";
+import { CloudAccountErrorScreen, CloudConfigurationScreen, CloudLoadingScreen, type LaunchAccount, useLaunchAccount } from "./launch-account";
 import { UnauthenticatedShell } from "./welcome-screen";
 import { BrandHeader, BrandSurface } from "./brand-header";
 import { SneakPeek } from "./sneak-peek";
@@ -20,6 +20,7 @@ import type { SavedLookRecord } from "@/lib/account-types";
 import { clearGuestProfileDraft, guestProfileIsComplete, readGuestProfileDraft } from "@/lib/guest-onboarding";
 import {
   profileRecordIsComplete,
+  profilePreferencesAreComplete,
   migrateLocalOnboardingCache,
   readOnboardingCache,
   resolveLaunchStage,
@@ -111,7 +112,7 @@ function FaceBlueprintEditor({ value, onChange }: { value:FaceBlueprint; onChang
 
 type MirrorStatus="starting"|"active"|"no-face"|"poor-light"|"denied"|"error";
 type VideoLandmarker={detectForVideo:(video:HTMLVideoElement,time:number)=>{faceLandmarks:Point[][]};close:()=>void};
-function SilentMirror({ areas, technique, shape, blueprint, stepNumber, paused, facingMode, onUnavailable }: { areas:LessonRegion[]; technique:Technique; shape:FaceShape|null; blueprint:FaceBlueprint|null; stepNumber:number; paused:boolean; facingMode:"user"|"environment"; onUnavailable:()=>void }) {
+function SilentMirror({ areas, technique, shape, blueprint, stepNumber, paused, facingMode, onUnavailable, onActive }: { areas:LessonRegion[]; technique:Technique; shape:FaceShape|null; blueprint:FaceBlueprint|null; stepNumber:number; paused:boolean; facingMode:"user"|"environment"; onUnavailable:()=>void; onActive:()=>void }) {
   const stage=useRef<HTMLDivElement>(null);
   const camera=useRef<HTMLVideoElement>(null);
   const [status,setStatus]=useState<MirrorStatus>("starting");
@@ -120,7 +121,6 @@ function SilentMirror({ areas, technique, shape, blueprint, stepNumber, paused, 
   // face rather than on a cropped guess at where the face might be.
   const [feedAspect,setFeedAspect]=useState(1);
   const [displayAspect,setDisplayAspect]=useState(9/16);
-  const [retry,setRetry]=useState(0);
   useEffect(()=>{
     const element=stage.current;
     if(!element)return;
@@ -142,8 +142,11 @@ function SilentMirror({ areas, technique, shape, blueprint, stepNumber, paused, 
         media=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facingMode}},audio:false});
         if(disposed){media.getTracks().forEach(track=>track.stop());return;}
         if(!videoElement) return;
-        videoElement.srcObject=media;await videoElement.play();
+        videoElement.srcObject=media;
+        if(!videoElement.videoWidth)await new Promise<void>(resolve=>{const done=()=>resolve();videoElement.addEventListener("loadedmetadata",done,{once:true});window.setTimeout(done,1500);});
+        await videoElement.play();
         if(videoElement.videoWidth&&videoElement.videoHeight)setFeedAspect(videoElement.videoWidth/videoElement.videoHeight);
+        onActive();
         const {FaceLandmarker,FilesetResolver}=await import("@mediapipe/tasks-vision");
         const vision=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
         const originalError=console.error;console.error=(...args:unknown[])=>{if(typeof args[0]==="string"&&args[0].includes("Created TensorFlow Lite XNNPACK delegate"))return;originalError(...args);};
@@ -172,15 +175,14 @@ function SilentMirror({ areas, technique, shape, blueprint, stepNumber, paused, 
     };
     void start();
     return()=>{disposed=true;cancelAnimationFrame(raf);landmarker?.close();media?.getTracks().forEach(track=>track.stop());if(videoElement)videoElement.srcObject=null;};
-  },[facingMode,retry,onUnavailable]);
+  },[facingMode,onActive,onUnavailable]);
   const copy:Record<MirrorStatus,string>={starting:"Starting your private mirror…",active:"Private mirror active · landmarks stay on this device","no-face":"No face detected. Center the selected feature in view.","poor-light":"Lighting is too low for stable placement. Face a soft light.",denied:"Camera permission was denied.",error:"The private mirror could not start on this device."};
-  return <div ref={stage} className={`silent-mirror${facingMode==="user"?" front-camera":""}`} style={{aspectRatio:"9 / 16"}}>
-    <div className="mirror-feed" style={{position:"absolute",width:"100%",height:"100%",maxWidth:`${feedAspect * displayAspect**-1 * 100}%`,maxHeight:`${displayAspect / feedAspect * 100}%`,top:"50%",left:"50%",transform:"translate(-50%,-50%)"}}><video ref={camera} className={facingMode==="user"?"mirrored":""} autoPlay muted playsInline/>
+  return <div ref={stage} className={`silent-mirror${facingMode==="user"?" front-camera":""}`}>
+    <div className="mirror-feed"><video ref={camera} className={facingMode==="user"?"mirrored":""} autoPlay muted playsInline/>
     {livePoints.length>0&&(
-      <PlacementGuide id="mirror" mirrored={facingMode==="user"} focused points={livePoints} areas={areas} technique={technique} shape={shape} blueprint={blueprint} aspect={feedAspect} displayAspect={feedAspect} stepNumber={stepNumber} paused={paused}/>
+      <PlacementGuide id="mirror" mirrored={facingMode==="user"} focused points={livePoints} areas={areas} technique={technique} shape={shape} blueprint={blueprint} aspect={feedAspect} displayAspect={displayAspect} stepNumber={stepNumber} paused={paused}/>
     )}
     </div><div className={`mirror-status ${status}`}><i/><span>{copy[status]}</span></div>
-    {(status==="denied"||status==="error")&&<button className="mirror-retry" onClick={()=>setRetry(value=>value+1)}>Retry camera</button>}
   </div>;
 }
 
@@ -201,8 +203,10 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [faceBlueprint, setFaceBlueprint] = useState<FaceBlueprint | null>(null);
   const [facePoints, setFacePoints] = useState<Point[]>([]);
   const [photoAspect, setPhotoAspect] = useState(3/4);
+  const [lessonDisplayAspect,setLessonDisplayAspect]=useState(9/16);
   const [mirrorOpen,setMirrorOpen]=useState(false);
   const [followMode,setFollowMode]=useState<FollowMode>("live");
+  const [preferredFollowMode,setPreferredFollowMode]=useState<FollowMode|null>(null);
   const [cameraUnavailable,setCameraUnavailable]=useState(false);
   const [cameraFacing,setCameraFacing]=useState<"user"|"environment">("user");
   const [guideCorner,setGuideCorner]=useState<"left"|"right">("right");
@@ -235,6 +239,10 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [savedLooks,setSavedLooks]=useState<SavedLookRecord[]>([]);
   const [saveStatus,setSaveStatus]=useState<"idle"|"saving"|"saved"|"error">("idle");
   const [saveError,setSaveError]=useState("");
+  const [profileSaveError,setProfileSaveError]=useState("");
+  const [profileSaving,setProfileSaving]=useState(false);
+  const [editingProfile,setEditingProfile]=useState(false);
+  const [upgradeOpen,setUpgradeOpen]=useState(false);
   const [onboardingCache,setOnboardingCache]=useState<OnboardingCache>({peekSeen:false,profileComplete:false});
   const onboardingCacheRef=useRef<OnboardingCache>({peekSeen:false,profileComplete:false});
   const lastHydratedUserId=useRef<string|null>(null);
@@ -245,6 +253,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const currentLesson = activeLesson[Math.min(step, activeLesson.length - 1)];
   const profileComplete=Boolean(profileName&&answers.skin&&answers.tone&&answers.level&&answers.goal);
   const serverProfileComplete=account.configured?profileRecordIsComplete(account.snapshot?.profile):profileComplete;
+  const serverPreferencesComplete=account.configured?profilePreferencesAreComplete(account.snapshot?.profile):Boolean(answers.skin&&answers.tone&&answers.level&&answers.goal);
   const subscriptionActive=subscriptionRecordIsActive(account.snapshot?.subscription);
   const launchStage:LaunchStage=resolveLaunchStage({profileComplete:serverProfileComplete,subscriptionActive,peekSeen:onboardingCache.peekSeen});
   const firstName=profileName.trim().split(/\s+/)[0]||"Bestie";
@@ -262,35 +271,40 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     return next;
   },[rememberOnboardingCache]);
   const followModeKey=`makeup-bestie-follow-mode-v1:${account.user?.id||"local"}`;
-  const rememberFollowMode=(mode:FollowMode)=>{
+  const rememberFollowMode=useCallback((mode:FollowMode)=>{
     setFollowMode(mode);
+    setPreferredFollowMode(mode);
     try{window.localStorage.setItem(followModeKey,mode);}catch{/* The mode still works for this session. */}
-  };
+  },[followModeKey]);
   const markCameraUnavailable=useCallback(()=>setCameraUnavailable(true),[]);
-  const handleLiveMirrorUnavailable=useCallback(()=>{setCameraUnavailable(true);setFollowMode("slides");setMirrorOpen(false);},[]);
+  const handleLiveMirrorUnavailable=useCallback(()=>{setCameraUnavailable(true);rememberFollowMode("slides");setMirrorOpen(false);},[rememberFollowMode]);
+  const handleLiveMirrorActive=useCallback(()=>setCameraUnavailable(false),[]);
 
   useEffect(()=>{
     document.body.classList.toggle("glam-room-open",immersiveLesson);
-    return()=>document.body.classList.remove("glam-room-open");
+    const measure=()=>{if(window.innerWidth&&window.innerHeight)setLessonDisplayAspect(window.innerWidth/window.innerHeight);};
+    if(immersiveLesson){measure();window.addEventListener("resize",measure);}
+    return()=>{document.body.classList.remove("glam-room-open");window.removeEventListener("resize",measure);};
   },[immersiveLesson]);
 
   const go = (v: View) => {
     let next=v;
-    if(["home","discover","creator","studio-intake","my-looks","profile"].includes(v)&&!profileComplete)next="onboarding";
+    if(["home","discover","creator","studio-intake","my-looks","profile"].includes(v)&&!(account.configured?serverProfileComplete:profileComplete))next="onboarding";
     if(v==="session"&&!brief)next="home";
 
     setView(next);window.scrollTo(0,0);
   };
   const switchFollowMode=(mode:FollowMode)=>{rememberFollowMode(mode);setMirrorOpen(mode==="live");};
-  const beginRoutine=(mode:FollowMode)=>{rememberFollowMode(mode);setStep(0);setMirrorOpen(mode==="live");setCameraFacing("user");setLessonPanelOpen(false);go("session");};
+  const beginRoutine=(mode:FollowMode,reset=true)=>{rememberFollowMode(mode);if(reset)setStep(0);setMirrorOpen(mode==="live");setCameraFacing("user");setLessonPanelOpen(false);go("session");};
   useEffect(()=>{
     let active=true;
-    queueMicrotask(()=>{if(!active)return;try{const saved=window.localStorage.getItem(followModeKey);if(saved==="live"||saved==="slides")setFollowMode(saved);}catch{/* Use the live mirror default. */}});
+    queueMicrotask(()=>{if(!active)return;try{const saved=window.localStorage.getItem(followModeKey);if(saved==="live"||saved==="slides"){setFollowMode(saved);setPreferredFollowMode(saved);}}catch{/* Use the live mirror default. */}});
     return()=>{active=false;};
   },[followModeKey]);
   useEffect(()=>{
     const cloudProfile=account.snapshot?.profile;
     const cloudUserId=account.user?.id||null;
+    if(account.configured&&account.user&&!account.snapshot)return;
     const shouldChooseInitialView=Boolean(cloudUserId&&lastHydratedUserId.current!==cloudUserId);
     if(cloudUserId)lastHydratedUserId.current=cloudUserId;
     const migratedCache=cloudUserId&&shouldChooseInitialView?migrateLocalOnboardingCache(cloudUserId):onboardingCacheRef.current;
@@ -310,7 +324,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
         const displayName=guestDraft.name?.trim()||String(account.user.user_metadata?.display_name||"").trim()||account.user.email?.split("@")[0]||"Bestie";
         queueMicrotask(()=>{
           setProfileName(displayName);setProfileEmail(account.user?.email||"");setAnswers({skin:guestDraft.skin||"",tone:guestDraft.tone||"",level:guestDraft.level||"",goal:guestDraft.goal||""});setOwnedProducts(guestDraft.products||[]);setLaunchResolved(false);
-          void mergeGuestProfile({display_name:displayName,skin_type:guestDraft.skin||"",skin_tone:guestDraft.tone||"",experience:guestDraft.level||"",makeup_goal:guestDraft.goal||"",products:guestDraft.products||[],face_shape:null,face_blueprint:null}).then(()=>{clearGuestProfileDraft();const nextCache={...migratedCache,profileComplete:true};rememberOnboardingCache(cloudUserId,nextCache);setView(resolveLaunchStage({profileComplete:true,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:nextCache.peekSeen}));setLaunchResolved(true);}).catch(()=>{guestMergeUserId.current=null;setView("onboarding");setLaunchResolved(true);});
+          void mergeGuestProfile({display_name:displayName,skin_type:guestDraft.skin||"",skin_tone:guestDraft.tone||"",experience:guestDraft.level||"",makeup_goal:guestDraft.goal||"",products:guestDraft.products||[],face_shape:null,face_blueprint:null}).then(()=>{clearGuestProfileDraft();setProfileSaveError("");const nextCache={...migratedCache,profileComplete:true};rememberOnboardingCache(cloudUserId,nextCache);setView(resolveLaunchStage({profileComplete:true,subscriptionActive:subscriptionRecordIsActive(account.snapshot?.subscription),peekSeen:nextCache.peekSeen}));setLaunchResolved(true);}).catch(()=>{setProfileSaveError("We couldn’t save your answers to your account. Check your connection, then try again.");setView("onboarding");setLaunchResolved(true);});
         });
         return;
       }
@@ -335,8 +349,8 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     } catch { queueMicrotask(()=>{setView("peek");setLaunchResolved(true);}); }
   },[account.configured,account.snapshot,account.user,mergeGuestProfile,rememberOnboardingCache]);
   useEffect(()=>{
-    if(launchResolved&&view==="pricing"&&launchStage==="home")queueMicrotask(()=>setView("home"));
-  },[launchResolved,launchStage,view]);
+    if(launchResolved&&view==="pricing"&&launchStage==="home"&&!upgradeOpen)queueMicrotask(()=>setView("home"));
+  },[launchResolved,launchStage,upgradeOpen,view]);
   const loadSavedLooks=useCallback(async()=>{
     if(!account.configured||!account.user)return;
     const response=await fetch("/api/saved-looks",{cache:"no-store"});
@@ -466,16 +480,16 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   if(!launchResolved)return <CloudLoadingScreen/>;
   if(view==="peek")return <SneakPeek onFinish={finishPeek}/>;
 
-  const showPricing=Boolean(account.configured&&account.snapshot&&!subscriptionActive&&(launchStage==="pricing"||view==="pricing"));
+  const showPricing=Boolean(account.configured&&account.snapshot&&view==="pricing"&&(!subscriptionActive||(upgradeOpen&&account.snapshot.subscription?.plan==="plus")));
   if(showPricing){
-    return <PricingScreen account={account.snapshot!} onRefresh={account.refresh} onSignOut={account.signOut}/>;
+    return <PricingScreen account={account.snapshot!} onRefresh={account.refresh} onSignOut={upgradeOpen?async()=>{setUpgradeOpen(false);setView("profile");}:account.signOut}/>;
   }
 
   if (view === "face-scan") return <ScanCamera onBack={()=>go("studio-intake")} onCameraUnavailable={markCameraUnavailable} busy={mapStatus==="analyzing"} message={mapMessage} onPhoto={async file=>{setPrepFile(file);setPreviewImage("");setPreviewStatus("idle");await analyzePreparationPhoto(file);go("confirm-features");}}/>;
   if(view==="confirm-features")return <main className="flow-screen"><button className="back" onClick={()=>go("face-scan")}>← Retake photo</button><h1>Make the analysis yours.</h1><p>We’ve analysed your scan. Change anything that’s off.</p>{shape&&<label>Face proportions<select value={shape} onChange={e=>setShape(e.target.value as FaceShape)}>{["heart","oval","round","square","oblong","diamond"].map(item=><option key={item}>{item}</option>)}</select></label>}{faceBlueprint&&<FaceBlueprintEditor value={faceBlueprint} onChange={setFaceBlueprint}/>}<p role="status">{mapMessage}</p><button className="primary" disabled={mapStatus!=="ready"||!faceBlueprint} onClick={()=>void continueFromFaceScan()}>Confirm features →</button></main>;
-  if(view==="follow-mode")return <main className="flow-screen follow-mode-screen page-enter"><button className="back" onClick={()=>go("confirm-features")}>← Back</button><div className="follow-mode-heading"><p className="eyebrow">Your Glam Room</p><h1>How do you want to follow along?</h1></div><div className="follow-mode-options"><button className={followMode==="live"?"selected":""} aria-pressed={followMode==="live"} onClick={()=>beginRoutine("live")}><span className="follow-mode-icon" aria-hidden="true">◉</span><strong>Live mirror</strong><small>Your camera stays on and the guides track your face. Talk to your bestie hands-free.</small>{followMode==="live"&&<em>Last used</em>}</button><button className={followMode==="slides"?"selected":""} aria-pressed={followMode==="slides"} onClick={()=>beginRoutine("slides")}><span className="follow-mode-icon" aria-hidden="true">▦</span><strong>Guided slides</strong><small>Step through on your photo, at your own pace. No camera, no battery drain.</small>{followMode==="slides"&&<em>Last used</em>}</button></div><p className="follow-mode-note">You can switch at any point in the routine.</p></main>;
+  if(view==="follow-mode")return <main className="flow-screen follow-mode-screen page-enter"><button className="back" onClick={()=>go("confirm-features")}>← Back</button><div className="follow-mode-heading"><p className="eyebrow">Your Glam Room</p><h1>How do you want to follow along?</h1></div><div className="follow-mode-options"><button className={preferredFollowMode==="live"?"selected":""} aria-pressed={preferredFollowMode==="live"} onClick={()=>beginRoutine("live")}><span className="follow-mode-icon" aria-hidden="true">◉</span><strong>Live mirror</strong><small>Your camera stays on and the guides track your face. Talk to your bestie hands-free.</small>{preferredFollowMode==="live"&&<em>Last used</em>}</button><button className={preferredFollowMode==="slides"?"selected":""} aria-pressed={preferredFollowMode==="slides"} onClick={()=>beginRoutine("slides")}><span className="follow-mode-icon" aria-hidden="true">▦</span><strong>Guided slides</strong><small>Step through on your photo, at your own pace. No camera, no battery drain.</small>{preferredFollowMode==="slides"&&<em>Last used</em>}</button></div><p className="follow-mode-note">You can switch at any point in the routine.</p></main>;
   if(view==="studio-intake"&&(lookUrl.trim()||lookFile))return <main className="flow-screen"><button className="back" disabled={lessonAnalyzing} onClick={()=>{go("home");setComposerOpen(true);}}>← Add tutorial</button><h1>Your makeup bag.</h1><p>Choose what you own. Missing products can be skipped or substituted.</p><div className="bag-chips">{productOptions.map(product=><button key={product} aria-pressed={ownedProducts.includes(product)} onClick={()=>setOwnedProducts(ownedProducts.includes(product)?ownedProducts.filter(item=>item!==product):[...ownedProducts,product])}>{product}</button>)}</div>{lessonAnalyzing&&<p role="status">Analyzing your tutorial · {lessonStage}</p>}{lessonError&&<p className="error">{lessonError}</p>}<div className="flow-actions"><button className="outline" disabled={lessonAnalyzing} onClick={createBrief}>Skip</button><button className="primary" disabled={lessonAnalyzing||(!lookUrl.trim()&&!lookFile)} onClick={createBrief}>{lessonAnalyzing?"Analyzing…":"Continue"}</button></div></main>;
-  if(view==="look-brief"&&brief)return <main className="flow-screen"><button className="back" onClick={()=>go("confirm-features")}>← Features</button><h1>Your lesson.</h1><p>Application by application · One product at a time.</p><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} applications</p><p>{brief.summary}</p><details><summary>Application order & uncertainties</summary><ol>{brief.steps.map((item,i)=><li key={i}>{item.product}{item.uncertain?" · uncertain detail":""}</li>)}</ol>{brief.uncertainties.map(item=><p key={item}>{item}</p>)}</details><button className="primary" onClick={()=>beginRoutine(followMode)}>Enter the Glam Room →</button></main>;
+  if(view==="look-brief"&&brief)return <main className="flow-screen"><button className="back" onClick={()=>go("confirm-features")}>← Features</button><h1>Your lesson.</h1><p>Application by application · One product at a time.</p><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} applications</p><p>{brief.summary}</p><details><summary>Application order & uncertainties</summary><ol>{brief.steps.map((item,i)=><li key={i}>{item.product}{item.uncertain?" · uncertain detail":""}</li>)}</ol>{brief.uncertainties.map(item=><p key={item}>{item}</p>)}</details><button className="primary" onClick={()=>beginRoutine(followMode,false)}>Enter the Glam Room →</button></main>;
   const renderPersonalizedPreview = () => brief ? <main className="flow-screen compact-preview"><div className="flow-actions"><button className="back" onClick={()=>go("look-brief")}>← Your lesson</button><button className="back" disabled={previewStatus==="generating"} onClick={()=>{setStep(0);setMirrorOpen(true);setCameraFacing("user");setLessonPanelOpen(false);go("session");}}>Skip →</button></div><h1>See the look before you start.</h1><p>Optional AI visualization—not a guaranteed result.</p><div className="preview-pair">{prepPhoto&&<img src={prepPhoto} alt="Your private starting photo"/>}{previewImage?<img src={previewImage} alt="Your personalized preview"/>:<div>Your preview appears here</div>}</div><div className="intensity-picker">
               <span>Preview intensity</span>
               {(["soft", "reference", "dramatic"] as const).map(item => <button key={item} className={previewIntensity === item ? "selected" : ""} onClick={() => {
@@ -493,14 +507,18 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   if (view === "onboarding") {
     const qs = [["skin","First, your canvas","How does your skin usually feel?",["Dry or tight","Oily or shiny","A little of both","Balanced","Sensitive"]],["tone","Your complexion","Which range feels closest to you?",["Fair","Light","Medium","Tan","Deep","Rich"]],["level","Your experience","Where are you in your makeup journey?",["Just starting","I know the basics","Confident","Basically an artist"]],["goal","Your moment","What do you want to learn first?",["Everyday natural","Soft glam","Full glam","Editorial color","Copy a saved look"]]] as const;
     const finishProfile=async()=>{
-      const nextAnswers={...answers};
-      if(account.configured)await account.saveProfile({display_name:profileName.trim(),skin_type:nextAnswers.skin||"",skin_tone:nextAnswers.tone||"",experience:nextAnswers.level||"",makeup_goal:nextAnswers.goal||"",products:ownedProducts,face_shape:shape,face_blueprint:faceBlueprint});
-      else window.localStorage.setItem("makeup-bestie-profile-v1",JSON.stringify({name:profileName.trim(),email:profileEmail.trim(),answers:nextAnswers,products:ownedProducts,faceBlueprint}));
-      const nextCache=updateOnboardingCache(account.user?.id,{profileComplete:true});
-      setView(account.configured?resolveLaunchStage({profileComplete:true,subscriptionActive,peekSeen:nextCache.peekSeen}):"home");window.scrollTo(0,0);
+      setProfileSaving(true);setProfileSaveError("");
+      try{
+        const nextAnswers={...answers};
+        if(account.configured)await account.saveProfile({display_name:profileName.trim(),skin_type:nextAnswers.skin||"",skin_tone:nextAnswers.tone||"",experience:nextAnswers.level||"",makeup_goal:nextAnswers.goal||"",products:ownedProducts,face_shape:shape,face_blueprint:faceBlueprint});
+        else window.localStorage.setItem("makeup-bestie-profile-v1",JSON.stringify({name:profileName.trim(),email:profileEmail.trim(),answers:nextAnswers,products:ownedProducts,faceBlueprint}));
+        const nextCache=updateOnboardingCache(account.user?.id,{profileComplete:true});
+        setEditingProfile(false);setView(editingProfile?"profile":account.configured?resolveLaunchStage({profileComplete:true,subscriptionActive,peekSeen:nextCache.peekSeen}):"home");window.scrollTo(0,0);
+      }catch{setProfileSaveError("We couldn’t save your profile. Check your connection and try again.");}
+      finally{setProfileSaving(false);}
     };
-    if(onboard===0)return <>{nav}<main className="onboarding account-onboarding page-enter"><div className="progress"><span style={{width:"17%"}}/></div><section className="question-card account-card"><p className="eyebrow">Welcome to Makeup Bestie</p><h1>Create your beauty profile.</h1><p className="subcopy">Your answers make every tutorial specific to your skin, products, experience, and goals. {account.configured?"They sync privately with your account.":"In local development, they stay in this browser."}</p><div className="account-fields"><label><span>Your name</span><input value={profileName} onChange={event=>setProfileName(event.target.value)} autoComplete="name" placeholder="What should your bestie call you?"/></label><label><span>Email</span><input type="email" value={profileEmail} disabled={account.configured} onChange={event=>setProfileEmail(event.target.value)} autoComplete="email" placeholder="you@example.com"/></label></div><button className="primary wide" disabled={!profileName.trim()||!/^\S+@\S+\.\S+$/.test(profileEmail)} onClick={()=>setOnboard(1)}>Personalize my profile →</button></section></main></>;
-    if(onboard===5)return <>{nav}<main className="onboarding page-enter"><div className="progress"><span style={{width:"100%"}} /></div><button className="back" onClick={()=>setOnboard(4)}>← Back</button><section className="question-card onboarding-products"><p className="eyebrow">Your makeup bag</p><h1>What do you already have?</h1><p className="subcopy">Choose as many as you like, or skip this for now. Your lesson will prioritize products you own and suggest substitutes for the rest.</p><div className="product-options">{productOptions.map(product=><label key={product} className={ownedProducts.includes(product)?"selected":""}><input type="checkbox" checked={ownedProducts.includes(product)} onChange={event=>setOwnedProducts(event.target.checked?[...ownedProducts,product]:ownedProducts.filter(item=>item!==product))}/><span>{product}</span><b>{ownedProducts.includes(product)?"✓":"+"}</b></label>)}</div><button className="primary wide" onClick={()=>void finishProfile()}>{ownedProducts.length?"Finish my profile":"Skip for now"} →</button></section></main></>;
+    if(onboard===0)return <>{nav}<main className="onboarding account-onboarding page-enter"><div className="progress"><span style={{width:"17%"}}/></div>{editingProfile&&<button className="back" onClick={()=>{setEditingProfile(false);setProfileSaveError("");setView("profile");}}>← Back to profile</button>}<section className="question-card account-card"><p className="eyebrow">Welcome to Makeup Bestie</p><h1>{serverPreferencesComplete?"What should your bestie call you?":"Create your beauty profile."}</h1><p className="subcopy">Your answers make every tutorial specific to your skin, products, experience, and goals. {account.configured?"They sync privately with your account.":"In local development, they stay in this browser."}</p><div className="account-fields"><label><span>Your name</span><input value={profileName} onChange={event=>setProfileName(event.target.value)} autoComplete="name" placeholder="What should your bestie call you?"/></label><label><span>Email</span><input type="email" value={profileEmail} disabled={account.configured&&Boolean(profileEmail)} onChange={event=>setProfileEmail(event.target.value)} autoComplete="email" placeholder="Optional if Apple did not share it"/></label></div>{profileSaveError&&<p className="error" role="alert">{profileSaveError}</p>}<button className="primary wide" disabled={profileSaving||!profileName.trim()||(Boolean(profileEmail)&&!/^\S+@\S+\.\S+$/.test(profileEmail))} onClick={()=>serverPreferencesComplete||profileComplete?void finishProfile():setOnboard(1)}>{profileSaving?"Saving…":profileSaveError?"Retry saving →":serverPreferencesComplete?"Save my name →":"Personalize my profile →"}</button></section></main></>;
+    if(onboard===5)return <>{nav}<main className="onboarding page-enter"><div className="progress"><span style={{width:"100%"}} /></div><button className="back" onClick={()=>setOnboard(4)}>← Back</button><section className="question-card onboarding-products"><p className="eyebrow">Your makeup bag</p><h1>What do you already have?</h1><p className="subcopy">Choose as many as you like, or skip this for now. Your lesson will prioritize products you own and suggest substitutes for the rest.</p><div className="product-options">{productOptions.map(product=><label key={product} className={ownedProducts.includes(product)?"selected":""}><input type="checkbox" checked={ownedProducts.includes(product)} onChange={event=>setOwnedProducts(event.target.checked?[...ownedProducts,product]:ownedProducts.filter(item=>item!==product))}/><span>{product}</span><b>{ownedProducts.includes(product)?"✓":"+"}</b></label>)}</div>{profileSaveError&&<p className="error" role="alert">{profileSaveError}</p>}<button className="primary wide" disabled={profileSaving} onClick={()=>void finishProfile()}>{profileSaving?"Saving…":ownedProducts.length?"Finish my profile →":"Skip for now →"}</button></section></main></>;
     const q=qs[onboard-1];
     return <>{nav}<main className="onboarding page-enter"><div className="progress"><span style={{width:`${Math.round(((onboard+1)/6)*100)}%`}} /></div><button className="back" onClick={() => setOnboard(onboard-1)}>← Back</button><section className="question-card"><p className="eyebrow">{q[1]}</p><h1>{q[2]}</h1><p className="subcopy">This personalizes technique—not your beauty.</p><div className="choice-grid">{q[3].map(o => <button key={o} className={answers[q[0]]===o?"selected":""} onClick={() => setAnswers({...answers,[q[0]]:o})}>{o}<b>{answers[q[0]]===o?"✓":"○"}</b></button>)}</div><button className="primary wide" disabled={!answers[q[0]]} onClick={() => setOnboard(onboard+1)}>Continue →</button></section></main></>;
   }
@@ -519,16 +537,16 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       const target = Math.max(0,Math.min(activeLesson.length-1,nextStep));
       setStep(target);setTutorialClipOpen(false);setLessonPanelOpen(false);
     };
-    const personalizedGuide=(compact=false)=><div className={`glam-face${compact?" compact-guide":""}`} style={{aspectRatio:String(photoAspect)}}>
+    const personalizedGuide=(compact=false)=><div className={`glam-face${compact?" compact-guide":""}`} style={compact?{aspectRatio:String(photoAspect)}:undefined}>
       <img src={prepPhoto} alt="Your face with a personalized makeup placement guide"/>
-      {activeLesson.slice(0,step).map((item,index)=><PlacementGuide key={`${item.product}-${index}`} id={`complete-${compact?"pip-":""}${index}`} soft focused stepNumber={index+1} points={facePoints} areas={stepAreas(item)} technique={item.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect}/>)}
-      <PlacementGuide id={compact?"lesson-pip":"lesson"} focused points={facePoints} areas={stepAreas(currentLesson)} technique={currentLesson.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect} stepNumber={step+1} paused={!guideMotion}/>
+      {activeLesson.slice(0,step).map((item,index)=><PlacementGuide key={`${item.product}-${index}`} id={`complete-${compact?"pip-":""}${index}`} soft focused stepNumber={index+1} points={facePoints} areas={stepAreas(item)} technique={item.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect} displayAspect={compact?undefined:lessonDisplayAspect}/>)}
+      <PlacementGuide id={compact?"lesson-pip":"lesson"} focused points={facePoints} areas={stepAreas(currentLesson)} technique={currentLesson.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect} displayAspect={compact?undefined:lessonDisplayAspect} stepNumber={step+1} paused={!guideMotion}/>
       {!compact&&<button className="guide-motion-toggle" aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Ⅱ Pause arrows":"▶ Animate arrows"}</button>}
       {!compact&&<div className="placement-key"><span/><b>{currentLesson.product}</b><small>Outline = where it goes · arrows = which way to blend</small></div>}
     </div>;
     return <>
       {nav}
-      <main className="glam-room lesson-active minimalist-mirror" onTouchStart={e=>{if(!(e.target as HTMLElement).closest("button,aside,.live-coach-dock"))swipeStart.current=e.touches[0].clientY;}} onTouchEnd={e=>{if(swipeStart.current===null)return;const dy=e.changedTouches[0].clientY-swipeStart.current;swipeStart.current=null;if(Math.abs(dy)>70)moveToStep(step+(dy<0?1:-1));}}><button className="camera-close" onClick={()=>{setMirrorOpen(false);go("home");}} aria-label="Close Glam Room">✕</button><span className="mirror-count">{step+1} of {activeLesson.length}</span>
+      <main className="glam-room lesson-active minimalist-mirror" onTouchStart={e=>{if(!(e.target as HTMLElement).closest("button,aside,.live-coach-dock"))swipeStart.current=e.touches[0].clientY;}} onTouchEnd={e=>{if(swipeStart.current===null)return;const dy=e.changedTouches[0].clientY-swipeStart.current;swipeStart.current=null;if(Math.abs(dy)>70){if(dy<0&&step===activeLesson.length-1)setLessonPanelOpen(true);else moveToStep(step+(dy<0?1:-1));}}}><button className="camera-close" onClick={()=>{setMirrorOpen(false);go("home");}} aria-label="Close Glam Room">✕</button><span className="glam-mode-badge">{mirrorOpen?"Live mirror":"Guided slides"}</span><span className="mirror-count">{step+1} of {activeLesson.length}</span>
         <div className="glam-heading">
           <div><p className="eyebrow">The Glam Room · Application {step+1} of {activeLesson.length}</p><h1>{brief?.title || "Your personalized lesson"}</h1><p>{mirrorOpen?"Your live mirror is open. Move through the product queue here and turn on the coach whenever you want to talk.":guidedSlides?"Step through at your own pace. Swipe or tap to move between applications.":"Your camera is paused. The personalized placement guide and full product queue are still available."}</p></div>
           <div className={`offline-pill${mirrorOpen?" active":""}`}><i/> {mirrorOpen?"Private camera active":guidedSlides?"Guided slides":"Camera paused"}</div>
@@ -536,7 +554,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
         <div className="glam-grid">
           <section className="glam-face-card">
             {mirrorOpen?<div className="feature-mirror-stage">
-              <SilentMirror areas={stepAreas(currentLesson)} technique={currentLesson.technique} shape={shape} blueprint={faceBlueprint} stepNumber={step+1} paused facingMode={cameraFacing} onUnavailable={handleLiveMirrorUnavailable}/>
+              <SilentMirror areas={stepAreas(currentLesson)} technique={currentLesson.technique} shape={shape} blueprint={faceBlueprint} stepNumber={step+1} paused facingMode={cameraFacing} onUnavailable={handleLiveMirrorUnavailable} onActive={handleLiveMirrorActive}/>
               <div className={`animated-guide-pip corner-${guideCorner}${guideExpanded?" expanded":""}`}>
                 <div className="animated-guide-title"><span>YOUR ANIMATED GUIDE</span><b>{currentLesson.product}</b></div>
                 {personalizedGuide(true)}
@@ -556,19 +574,16 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
               <button className="mirror-product" onClick={()=>setLessonPanelOpen(true)}>{currentLesson.product} ⓘ</button><div className="mirror-toolbar" aria-label="Mirror controls">
                 <button disabled={step===0} onClick={()=>moveToStep(step-1)}><span>←</span>Previous</button>
                 {step===activeLesson.length-1?<button className="next-application" onClick={()=>{setMirrorOpen(false);go("finished");}}><span>✓</span>Finish look</button>:<button className="next-application" onClick={()=>moveToStep(step+1)}><span>→</span>Next product</button>}
-                <button aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}><span>{guideMotion?"Ⅱ":"▶"}</span>{guideMotion?"Pause arrows":"Play arrows"}</button>
-                <button onClick={()=>setGuideCorner(value=>value==="right"?"left":"right")}><span>⇄</span>Move guide</button>
-                <button aria-pressed={guideExpanded} onClick={()=>setGuideExpanded(value=>!value)}><span>{guideExpanded?"↙":"↗"}</span>{guideExpanded?"Shrink guide":"Expand guide"}</button>
-                <button onClick={()=>setCameraFacing(value=>value==="user"?"environment":"user")}><span>↻</span>Flip camera</button>
                 <button className="stop-camera" onClick={()=>switchFollowMode("slides")}><span>▦</span>Switch to guided slides</button>
               </div>
             </div>:personalizedGuide()}
+            {!mirrorOpen&&<nav className="slide-controls" aria-label="Guided slide controls"><button disabled={step===0} onClick={()=>moveToStep(step-1)} aria-label="Previous product">←</button><button className="slide-step" onClick={()=>setLessonPanelOpen(true)}>{step+1} / {activeLesson.length}<small>Details</small></button>{step===activeLesson.length-1?<button onClick={()=>{setMirrorOpen(false);go("finished");}} aria-label="Finish look">✓</button>:<button onClick={()=>moveToStep(step+1)} aria-label="Next product">→</button>}<button className="slide-switch" onClick={()=>switchFollowMode("live")}>◉ <span>Live</span></button></nav>}
             <div className="glam-face-caption"><span>{mirrorOpen?"Live mirror · on-device tracking":guidedSlides?"Your photo · placement guide":"Camera paused · scanned-face guide"}</span><b>{currentLesson.product} · {areaSummary(currentLesson)}</b></div>
           </section>
           <aside onTouchStart={e=>{swipeStart.current=e.touches[0].clientY;}} onTouchEnd={e=>{if(swipeStart.current!==null&&e.changedTouches[0].clientY-swipeStart.current>60)setLessonPanelOpen(false);swipeStart.current=null;}} className={`glam-lesson-card${lessonPanelOpen?" panel-open":" panel-closed"}`}>
             <button className="lesson-panel-handle" aria-expanded={lessonPanelOpen} onClick={()=>setLessonPanelOpen(value=>!value)}><span/><b>{currentLesson.product} · Step {step+1}</b><small>{lessonPanelOpen?"Hide":"Details"}</small></button>
             <div className="lesson-panel-content">
-              <div className="sheet-tools"><button className="outline" onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Pause arrows":"Animate arrows"}</button>{mirrorOpen&&<button className="outline" onClick={()=>setCameraFacing(value=>value==="user"?"environment":"user")}>Flip camera</button>}<button className="outline" onClick={()=>switchFollowMode(mirrorOpen?"slides":"live")}>{mirrorOpen?"Switch to guided slides":"Switch to live mirror"}</button></div>
+              <div className="sheet-tools"><button className="outline" onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Pause arrows":"Animate arrows"}</button><button className="outline" onClick={()=>setGuideCorner(value=>value==="right"?"left":"right")}>Move guide</button><button className="outline" onClick={()=>setGuideExpanded(value=>!value)}>{guideExpanded?"Shrink guide":"Expand guide"}</button>{mirrorOpen&&<button className="outline" onClick={()=>setCameraFacing(value=>value==="user"?"environment":"user")}>Flip camera</button>}<button className="outline" onClick={()=>switchFollowMode(mirrorOpen?"slides":"live")}>{mirrorOpen?"Switch to guided slides":"Switch to live mirror"}</button></div>
               <div className="lesson-progress"><span>Application queue</span><span>Step {step+1} of {activeLesson.length}</span></div>
               <div className="dots">{activeLesson.map((_,index)=><i key={index} className={index<=step?"active":""}/>)}</div>
               <p className="eyebrow">Now we’re using</p><h2>{currentLesson.product}</h2>
@@ -607,7 +622,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       </div></BrandHeader>
       <div className="working-surface">
       <section className="profile-summary-row"><div><p className="eyebrow">Your private beauty profile</p><p>{profileEmail} · {answers.skin||"Skin not set"} · {answers.goal||"Goal not set"}</p></div>
-        <button className="outline" onClick={()=>{setOnboard(0);setView("onboarding");window.scrollTo(0,0);}}>Edit profile</button>
+        <button className="outline" onClick={()=>{setEditingProfile(true);setProfileSaveError("");setOnboard(0);setView("onboarding");window.scrollTo(0,0);}}>Edit profile</button>
       </section>
       <div className="stat-row">
         <div><b>{savedLookCount}</b><span>Saved looks</span></div>
@@ -617,7 +632,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       <button className="profile-looks-link" onClick={()=>go("my-looks")}><span><small>MY LOOKS</small><b>Open your private beauty shelf</b><em>{savedLookCount} saved</em></span><i>→</i></button>
       <section className="profile-details"><div><small>SKIN</small><b>{answers.skin}</b></div><div><small>COMPLEXION</small><b>{answers.tone}</b></div><div><small>EXPERIENCE</small><b>{answers.level}</b></div><div><small>MAKEUP GOAL</small><b>{answers.goal}</b></div></section>
       {faceBlueprint&&<section className="profile-blueprint"><div><small>FACE BLUEPRINT</small><h2>Your confirmed feature fit</h2></div><p>{faceBlueprintSummary(faceBlueprint)}</p><span>Update it the next time you take a face scan.</span></section>}
-      <section className="account-management"><div><small>SUBSCRIPTION</small><b>{account.snapshot?.subscription?.plan==="unlimited"?"Makeup Bestie Unlimited":"Makeup Bestie Plus"}</b><p>{account.snapshot?.subscription?.cancel_at_period_end?"Cancels at the end of the current billing period.":account.snapshot?.subscription?.source==="apple"?"Active · manage or cancel through your Apple ID subscriptions.":"Active · manage or cancel securely through Stripe."}</p></div>{account.configured&&<ManageBillingButton/>}</section>
+      <section className="account-management"><div><small>SUBSCRIPTION</small><b>{account.snapshot?.subscription?.plan==="unlimited"?"Makeup Bestie Unlimited":"Makeup Bestie Plus"}</b><p>{account.snapshot?.subscription?.cancel_at_period_end?"Cancels at the end of the current billing period.":account.snapshot?.subscription?.source==="apple"?"Active · manage or cancel through your Apple ID subscriptions.":"Active · manage or cancel securely through Stripe."}</p></div>{account.configured&&<div className="account-billing-actions">{account.snapshot?.subscription?.plan==="plus"&&<button className="primary" onClick={()=>{setUpgradeOpen(true);setView("pricing");}}>Upgrade to Unlimited</button>}<ManageBillingButton/></div>}</section>
       <p className="profile-note">Your beauty preferences and deliberately saved looks sync privately to your account. Landmark coordinates and Glam Room camera footage remain on your device. Bare-face scans are not stored.</p>
       {account.configured&&<><div className="profile-legal-links"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div><div className="profile-account-actions"><button className="text-button" onClick={()=>void account.signOut()}>Sign out</button><button className="text-button danger" onClick={()=>void deleteAccount()}>Delete account and data</button></div></>}
       </div>
@@ -632,6 +647,7 @@ export default function App() {
   const account=useLaunchAccount();
   if(process.env.NODE_ENV==="production"&&!account.configured)return <CloudConfigurationScreen/>;
   if(account.loading)return <CloudLoadingScreen/>;
+  if(account.error)return <CloudAccountErrorScreen onRetry={()=>void account.refresh().catch(()=>undefined)}/>;
   if(account.configured&&!account.user)return <UnauthenticatedShell/>;
   return <MakeupBestieExperience account={account}/>;
 }

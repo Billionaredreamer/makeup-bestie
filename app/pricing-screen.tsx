@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AccountSnapshot, SubscriptionPlan } from "@/lib/account-types";
 import { isNativeIOSApp } from "@/lib/platform";
 import { configureRevenueCat, purchasePlan, restorePurchases } from "@/lib/revenuecat";
+import { subscriptionRecordIsActive } from "@/lib/onboarding-flow";
 
 type BillingPayload = { error?: string; url?: string };
 
@@ -14,29 +15,45 @@ async function readBillingPayload(response: Response): Promise<BillingPayload> {
   catch { return {}; }
 }
 
-export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnapshot;onRefresh:()=>Promise<void>;onSignOut:()=>Promise<void>}) {
-  const [selectedPlan,setSelectedPlan]=useState<SubscriptionPlan>("plus");
+export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnapshot;onRefresh:()=>Promise<AccountSnapshot|null>;onSignOut:()=>Promise<void>}) {
+  const nativeIOS=isNativeIOSApp();
+  const [selectedPlan,setSelectedPlan]=useState<SubscriptionPlan>(account.subscription?.plan==="plus"?"unlimited":"plus");
   const [busy,setBusy]=useState<SubscriptionPlan|null>(null);
   const [error,setError]=useState("");
   const [confirming,setConfirming]=useState(false);
   const [restoring,setRestoring]=useState(false);
-  const nativeIOS=isNativeIOSApp();
+  const [storeReady,setStoreReady]=useState(!nativeIOS);
+  const [storeInitializing,setStoreInitializing]=useState(nativeIOS);
   // Set to false when this screen unmounts, which is exactly what happens the
   // moment the subscription goes active. The Apple poll below uses it both as
   // its success signal and to avoid setting state after unmount.
   const mounted=useRef(true);
-  useEffect(()=>()=>{mounted.current=false;},[]);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   useEffect(()=>{
     if(!nativeIOS)return;
-    configureRevenueCat(account.user.id).catch((caught)=>{setError(caught instanceof Error?caught.message:"Could not connect to the App Store.");});
+    configureRevenueCat(account.user.id).then(()=>{if(mounted.current)setStoreReady(true);}).catch((caught)=>{if(mounted.current)setError(caught instanceof Error?caught.message:"Could not connect to the App Store.");}).finally(()=>{if(mounted.current)setStoreInitializing(false);});
   },[nativeIOS,account.user.id]);
   useEffect(()=>{
     if(new URLSearchParams(window.location.search).get("checkout")!=="success")return;
     let cancelled=false;let attempts=0;let timer=0;queueMicrotask(()=>{if(!cancelled)setConfirming(true);});
-    const poll=async()=>{attempts+=1;await onRefresh();if(cancelled)return;if(attempts>=10){setConfirming(false);setError("Your payment completed, but plan activation is taking longer than expected. Refresh this page in a moment; you will not be charged twice.");return;}timer=window.setTimeout(()=>void poll(),1500);};
+    const poll=async()=>{attempts+=1;const snapshot=await onRefresh().catch(()=>null);if(cancelled)return;if(subscriptionRecordIsActive(snapshot?.subscription)){setConfirming(false);return;}if(attempts>=10){setConfirming(false);setError("Your payment completed, but plan activation is taking longer than expected. Refresh this page in a moment; you will not be charged twice.");return;}timer=window.setTimeout(()=>void poll(),1500);};
     void poll();
     return()=>{cancelled=true;window.clearTimeout(timer);};
   },[onRefresh]);
+  const waitForEntitlement=async(plan:SubscriptionPlan)=>{
+    for(let attempt=0;attempt<19&&mounted.current;attempt+=1){
+      const snapshot=await onRefresh().catch(()=>null);
+      const matches=subscriptionRecordIsActive(snapshot?.subscription)&&(plan!=="unlimited"||snapshot?.subscription?.plan==="unlimited");
+      if(matches)return true;
+      await new Promise(resolve=>window.setTimeout(resolve,attempt<10?1500:5000));
+    }
+    return false;
+  };
+  const recoverRevenueCatEntitlement=async()=>{
+    const response=await fetch("/api/billing/revenuecat-restore",{method:"POST",signal:AbortSignal.timeout(15_000)});
+    const data=await readBillingPayload(response);
+    if(!response.ok)throw new Error(data.error||"The restored purchase could not be linked to your account.");
+  };
   // Web keeps the existing Stripe Checkout redirect exactly as before.
   const checkoutWithStripe=async(plan:SubscriptionPlan)=>{
     try{const response=await fetch("/api/billing/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan})});const data=await readBillingPayload(response);if(!response.ok)throw new Error(data.error||`Secure checkout is unavailable (${response.status}).`);if(!data.url)throw new Error("Secure checkout did not return a destination. Please try again.");window.location.assign(data.url);}
@@ -54,20 +71,19 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
       // left the buyer sitting on the paywall with no error and no way out.
       // Poll on the same schedule the Stripe path already uses.
       setConfirming(true);
-      for(let attempt=0;attempt<10&&mounted.current;attempt+=1){
-        await onRefresh();
-        if(!mounted.current)return;
-        await new Promise(resolve=>{window.setTimeout(resolve,1500);});
-      }
+      if(await waitForEntitlement(plan))return;
       if(!mounted.current)return;
+      await recoverRevenueCatEntitlement();
+      if(await waitForEntitlement(plan))return;
       setConfirming(false);
-      setError("Your purchase went through, but activating your plan is taking longer than expected. Tap Restore purchases in a moment — you will not be charged twice.");
+      setError("Your purchase went through, but activation is taking longer than expected. Tap Restore purchases — you will not be charged twice.");
       setBusy(null);
     }catch(caught){
       if(!mounted.current)return;
       setConfirming(false);
       const message=caught instanceof Error?caught.message:"";
-      if(!/cancel/i.test(message))setError(message||"Purchase could not be completed.");
+      const code=typeof caught==="object"&&caught&&"code" in caught?String(caught.code):"";
+      if(code!=="USER_CANCELLED"&&!/^purchase (was )?cancelled\.?$/i.test(message.trim()))setError(message||"Purchase could not be completed.");
       setBusy(null);
     }
   };
@@ -78,11 +94,11 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
   };
   const restore=async()=>{
     setRestoring(true);setError("");
-    try{const activePlan=await restorePurchases();if(!activePlan)throw new Error("No previous purchase was found for this Apple ID.");await onRefresh();}
+    try{const activePlan=await restorePurchases();if(!activePlan)throw new Error("No previous purchase was found for this Apple ID.");await recoverRevenueCatEntitlement();if(!await waitForEntitlement(activePlan))throw new Error("Your purchase was found, but account activation is still pending. Please try Restore once more shortly.");}
     catch(caught){setError(caught instanceof Error?caught.message:"Restore could not be completed.");}
     finally{setRestoring(false);}
   };
-  const unavailable=Boolean(busy)||confirming||restoring;
+  const unavailable=Boolean(busy)||confirming||restoring||(nativeIOS&&(storeInitializing||!storeReady));
   return <main className="launch-paywall">
     <div className="paywall-content">
       <header className="paywall-top"><span className="paywall-mark" aria-hidden="true">m</span><button className="paywall-close" onClick={onSignOut} disabled={unavailable} aria-label="Close and sign out" title="Close and sign out">×</button></header>
@@ -100,7 +116,7 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
       <footer className="paywall-bottom">
         {confirming&&<p className="paywall-message" role="status">Payment received. We’re securely activating your plan…</p>}
         {error&&<p className="paywall-message" role="alert">{error}</p>}
-        <button className="primary paywall-subscribe" disabled={unavailable} onClick={()=>checkout(selectedPlan)}>{busy?(nativeIOS?"Opening the App Store…":"Opening checkout…"):"Subscribe"}</button>
+        <button className="primary paywall-subscribe" disabled={unavailable} onClick={()=>checkout(selectedPlan)}>{storeInitializing?"Connecting to the App Store…":busy?(nativeIOS?"Opening the App Store…":"Opening checkout…"):account.subscription?.plan==="plus"&&selectedPlan==="unlimited"?"Upgrade to Unlimited":"Subscribe"}</button>
         <p className="paywall-renewal">Renews monthly until cancelled. {nativeIOS?"Billed through your Apple ID. Cancel anytime in Settings → Apple ID → Subscriptions.":"Cancel anytime from Profile → Manage subscription."}</p>
         <nav className="paywall-legal" aria-label="Subscription information">
           {nativeIOS&&<button disabled={unavailable} onClick={restore}>{restoring?"Restoring…":"Restore purchases"}</button>}

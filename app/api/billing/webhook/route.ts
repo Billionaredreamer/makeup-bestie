@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe, planForPrice } from "@/lib/stripe";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { subscriptionRecordIsActive } from "@/lib/onboarding-flow";
 
 export const runtime = "nodejs";
 
@@ -14,17 +15,24 @@ const periodEnd = (subscription: Stripe.Subscription) => {
 async function syncSubscription(subscription: Stripe.Subscription) {
   const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
   const admin = createSupabaseAdminClient();
-  const { data: existing, error: lookupError } = await admin.from("subscriptions").select("user_id,plan").eq("stripe_customer_id",customerId).maybeSingle();
-  if (lookupError) throw lookupError;
+  let lookup = await admin.from("subscriptions").select("user_id,plan,source,status,current_period_end").eq("stripe_customer_id",customerId).maybeSingle();
+  if (lookup.error) throw lookup.error;
+  if (!lookup.data && subscription.metadata.user_id) {
+    lookup = await admin.from("subscriptions").select("user_id,plan,source,status,current_period_end").eq("user_id",subscription.metadata.user_id).maybeSingle();
+    if (lookup.error) throw lookup.error;
+  }
+  const existing = lookup.data;
   const userId = subscription.metadata.user_id || existing?.user_id;
   // Ignore subscriptions that do not belong to Makeup Bestie rather than
   // attaching an unrelated Stripe customer to an account.
   if (!userId) return false;
+  if (existing?.source === "apple" && subscriptionRecordIsActive(existing)) return false;
   const priceId = subscription.items.data[0]?.price.id || null;
   const plan = planForPrice(priceId) || subscription.metadata.plan || existing?.plan || null;
   if (plan !== "plus" && plan !== "unlimited") throw new Error("The subscription price is not mapped to a Makeup Bestie plan.");
   const { error } = await admin.from("subscriptions").upsert({
     user_id: userId,
+    source: "stripe",
     stripe_customer_id: customerId,
     stripe_subscription_id: subscription.id,
     price_id: priceId,
@@ -32,6 +40,8 @@ async function syncSubscription(subscription: Stripe.Subscription) {
     status: subscription.status,
     current_period_end: periodEnd(subscription) ? new Date(periodEnd(subscription)! * 1000).toISOString() : null,
     cancel_at_period_end: subscription.cancel_at_period_end,
+    revenuecat_app_user_id: null,
+    apple_original_transaction_id: null,
     updated_at: new Date().toISOString(),
   }, { onConflict: "user_id" });
   if (error) throw error;

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, serverCloudConfigured } from "@/lib/supabase/server";
+import { subscriptionRecordIsActive } from "@/lib/onboarding-flow";
 
 export const runtime = "nodejs";
 
@@ -27,8 +28,8 @@ export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return NextResponse.json({ error: "Sign in to start the live coach." }, { status: 401 });
-  const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", auth.user.id).maybeSingle();
-  if (!subscription || !["active", "trialing"].includes(subscription.status)) {
+  const { data: subscription } = await supabase.from("subscriptions").select("status,current_period_end").eq("user_id", auth.user.id).maybeSingle();
+  if (!subscriptionRecordIsActive(subscription)) {
     return NextResponse.json({ error: "An active Makeup Bestie plan is required for the live coach." }, { status: 402 });
   }
 

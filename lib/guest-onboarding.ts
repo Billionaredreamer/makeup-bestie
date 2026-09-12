@@ -27,7 +27,7 @@ export function readGuestProfileDraft(): GuestProfileDraft {
 
 export function writeGuestProfileDraft(update:Partial<GuestProfileDraft>):GuestProfileDraft {
   const next={...readGuestProfileDraft(),...update};
-  if(typeof window!=="undefined")window.localStorage.setItem(GUEST_PROFILE_KEY,JSON.stringify(next));
+  if(typeof window!=="undefined")try{window.localStorage.setItem(GUEST_PROFILE_KEY,JSON.stringify(next));}catch{/* Navigation must still work in storage-restricted WebViews. */}
   return next;
 }
 

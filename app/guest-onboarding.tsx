@@ -2,9 +2,9 @@
 import { useState } from "react";
 import { guestProductOptions, guestProfileIsComplete, guestQuestions, readGuestProfileDraft, startingProfileLines, writeGuestProfileDraft, type GuestProfileDraft } from "@/lib/guest-onboarding";
 
-export function GuestOnboarding({onBack,onSave}:{onBack:()=>void;onSave:()=>void}){
+export function GuestOnboarding({onBack,onSave,startAtSummary=false}:{onBack:()=>void;onSave:()=>void;startAtSummary?:boolean}){
   const [draft,setDraft]=useState<GuestProfileDraft>(()=>readGuestProfileDraft());
-  const [step,setStep]=useState(()=>guestProfileIsComplete(readGuestProfileDraft())?5:0);
+  const [step,setStep]=useState(()=>startAtSummary||guestProfileIsComplete(readGuestProfileDraft())?5:0);
   const update=(change:Partial<GuestProfileDraft>)=>{const next=writeGuestProfileDraft(change);setDraft(next);};
   if(step===5){
     const chips=[draft.goal,draft.skin,draft.tone&&`${draft.tone} depth`,draft.level].filter(Boolean) as string[];
