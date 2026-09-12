@@ -35,9 +35,16 @@ export function UnauthenticatedShell() {
     if(next==="peek")setScreen("peek");else if(next==="auth")openAuth("signup");else setScreen("onboarding");
     window.scrollTo(0,0);
   };
+  const continueAfterProfile=()=>{
+    const draft=readGuestProfileDraft();
+    const cached=readOnboardingCache(null);
+    const next=resolveLaunchStage({profileComplete:guestProfileIsComplete(draft),subscriptionActive:false,peekSeen:cached.peekSeen,authenticated:false,startingProfileSeen:draft.startingProfileSeen===true});
+    if(next==="peek")setScreen("peek");else openAuth("signup");
+    window.scrollTo(0,0);
+  };
   const backFromAuth=()=>setScreen(initialMode==="signup"&&guestProfileIsComplete(readGuestProfileDraft())?"onboarding":"welcome");
   if (screen === "welcome") return <WelcomeScreen onStart={startOnboarding} onSignIn={() => openAuth("signin")}/>;
-  if(screen==="peek")return <SneakPeek onFinish={()=>{writeOnboardingCache(null,{peekSeen:true});setScreen("onboarding");window.scrollTo(0,0);}}/>;
-  if(screen==="onboarding")return <GuestOnboarding onBack={()=>setScreen("welcome")} onSave={()=>openAuth("signup")}/>;
+  if(screen==="peek")return <SneakPeek onFinish={()=>{writeOnboardingCache(null,{peekSeen:true});openAuth("signup");}}/>;
+  if(screen==="onboarding")return <GuestOnboarding onBack={()=>setScreen("welcome")} onSave={continueAfterProfile}/>;
   return <AuthScreen initialMode={initialMode} onBack={backFromAuth}/>;
 }

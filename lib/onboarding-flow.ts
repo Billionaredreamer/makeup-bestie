@@ -81,9 +81,10 @@ export function resolveLaunchStage({
   startingProfileSeen = false,
 }: LaunchStageInput&{authenticated?:boolean}): LaunchStage|GuestLaunchStage {
   if(!authenticated){
-    if(!peekSeen)return "peek";
     if(!profileComplete)return "onboarding";
-    return startingProfileSeen?"auth":"starting-profile";
+    if(!startingProfileSeen)return "starting-profile";
+    if(!peekSeen)return "peek";
+    return "auth";
   }
   if (profileComplete && subscriptionActive) return "home";
   if (!peekSeen) return "peek";

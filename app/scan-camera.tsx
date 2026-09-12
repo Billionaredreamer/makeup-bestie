@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
-export function ScanCamera({ onPhoto, onBack, busy, message }: { onPhoto:(file:File)=>void; onBack:()=>void; busy:boolean; message:string }) {
+export function ScanCamera({ onPhoto, onBack, onCameraUnavailable, busy, message }: { onPhoto:(file:File)=>void; onBack:()=>void; onCameraUnavailable?:()=>void; busy:boolean; message:string }) {
   const video=useRef<HTMLVideoElement>(null);
   const [error,setError]=useState("");
   useEffect(()=>{
@@ -12,9 +12,9 @@ export function ScanCamera({ onPhoto, onBack, busy, message }: { onPhoto:(file:F
     }).then(async media=>{
       if(disposed){media.getTracks().forEach(track=>track.stop());return;}
       stream=media;if(video.current){video.current.srcObject=media;await video.current.play();}
-    }).catch(()=>setError("Camera unavailable. Allow camera access or choose a photo below."));
+    }).catch(()=>{setError("Camera unavailable. Allow camera access or choose a photo below.");onCameraUnavailable?.();});
     return()=>{disposed=true;stream?.getTracks().forEach(track=>track.stop());};
-  },[]);
+  },[onCameraUnavailable]);
   const capture=()=>{
     const source=video.current;if(!source?.videoWidth)return;
     const canvas=document.createElement("canvas");canvas.width=source.videoWidth;canvas.height=source.videoHeight;
