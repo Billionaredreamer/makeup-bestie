@@ -50,6 +50,7 @@ type View = "confirm-features" | "follow-mode" | "finished" | "peek" | "pricing"
 type FollowMode = "live" | "slides";
 type LessonStep = { title: string; instruction: string; product: string; region: LessonRegion; areas: LessonRegion[]; technique: Technique; referenceCue: string; adaptation: string; checkpoint: string; startTimeSeconds: number; endTimeSeconds: number; uncertain: boolean; addedByBestie?: boolean };
 type LookBrief = { title: string; summary: string; adaptation: string; difficulty: string; time: string; products: string[]; uncertainties: string[]; analysisScope: string; steps: LessonStep[]; sourceUrl?: string; sourceVideoAnalyzed?: boolean };
+const ROUTINE_RESUME_WINDOW_MS = 2 * 60 * 60 * 1000;
 const defaultLesson: LessonStep[] = [
   { title:"Prep your canvas", instruction:"Press primer into the center, then blend outward.", product:"Primer", region:"all-face", areas:["all-face"], technique:"prep", referenceCue:"Foundation preparation", adaptation:"Use thin, comfortable layers.", checkpoint:"Skin feels comfortable and looks evenly prepped without visible buildup.", startTimeSeconds:0, endTimeSeconds:8, uncertain:false },
   { title:"Even the base", instruction:"Tap skin tint in thin layers; keep the hairline sheer.", product:"Skin tint or foundation", region:"complexion", areas:["complexion","forehead","both-cheeks","nose","jaw"], technique:"base", referenceCue:"Even complexion", adaptation:"Add coverage only where you want it.", checkpoint:"The complexion looks even while natural skin texture remains visible.", startTimeSeconds:8, endTimeSeconds:22, uncertain:false },
@@ -223,6 +224,10 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [lessonStage, setLessonStage] = useState("");
   const [lessonError, setLessonError] = useState("");
   const [brief, setBrief] = useState<LookBrief | null>(null);
+  const [routineStarted,setRoutineStarted]=useState(false);
+  const [routineCompleted,setRoutineCompleted]=useState(false);
+  const [resumeExpiresAt,setResumeExpiresAt]=useState<number|null>(null);
+  const [resumeClock,setResumeClock]=useState(()=>Date.now());
   const [ownedProducts, setOwnedProducts] = useState<string[]>([]);
   const [prepPhoto, setPrepPhoto] = useState("");
   const [mapStatus, setMapStatus] = useState<"idle"|"analyzing"|"ready"|"no-face"|"error">("idle");
@@ -261,6 +266,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const firstName=profileName.trim().split(/\s+/)[0]||"Bestie";
   const homeFlowActive=["home","studio-intake","face-scan","look-brief","session"].includes(view);
   const immersiveLesson=view==="session";
+  const resumeAvailable=Boolean(brief&&!routineCompleted&&resumeExpiresAt&&resumeExpiresAt>resumeClock);
 
   const rememberOnboardingCache=useCallback((userId:string|null|undefined,next:OnboardingCache)=>{
     onboardingCacheRef.current=next;
@@ -281,6 +287,16 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const markCameraUnavailable=useCallback(()=>setCameraUnavailable(true),[]);
   const handleLiveMirrorUnavailable=useCallback(()=>{setCameraUnavailable(true);rememberFollowMode("slides");setMirrorOpen(false);},[rememberFollowMode]);
   const handleLiveMirrorActive=useCallback(()=>setCameraUnavailable(false),[]);
+  const armRoutineResume=useCallback(()=>{
+    const now=Date.now();
+    setRoutineStarted(false);setRoutineCompleted(false);setResumeExpiresAt(now+ROUTINE_RESUME_WINDOW_MS);setResumeClock(now);
+  },[]);
+  const clearRoutineDraft=useCallback(()=>{
+    setBrief(null);setRoutineStarted(false);setRoutineCompleted(false);setResumeExpiresAt(null);setStep(0);setMirrorOpen(false);setLessonPanelOpen(false);setTutorialClipOpen(false);setPrepPhoto("");setPrepFile(null);setPreviewImage("");setPreviewStatus("idle");setMapStatus("idle");setFacePoints([]);setLookUrl("");setLookFile(null);setLookReferenceFrame("");setTutorialVideoUrl(current=>{if(current.startsWith("blob:"))URL.revokeObjectURL(current);return "";});
+  },[]);
+  const finishRoutine=useCallback(()=>{
+    setRoutineCompleted(true);setResumeExpiresAt(null);setMirrorOpen(false);setLessonPanelOpen(false);setView("finished");window.scrollTo(0,0);
+  },[]);
 
   useEffect(()=>{
     document.body.classList.toggle("glam-room-open",immersiveLesson);
@@ -297,7 +313,20 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     setView(next);window.scrollTo(0,0);
   };
   const switchFollowMode=(mode:FollowMode)=>{rememberFollowMode(mode);setMirrorOpen(mode==="live");};
-  const beginRoutine=(mode:FollowMode,reset=true)=>{rememberFollowMode(mode);if(reset)setStep(0);setMirrorOpen(mode==="live");setCameraFacing("user");setLessonPanelOpen(false);go("session");};
+  const beginRoutine=(mode:FollowMode,reset=true)=>{rememberFollowMode(mode);if(reset)setStep(0);setRoutineStarted(true);setMirrorOpen(mode==="live");setCameraFacing("user");setLessonPanelOpen(false);go("session");};
+  const resumeRoutine=()=>{
+    if(!brief||routineCompleted||!resumeExpiresAt||resumeExpiresAt<=Date.now()){clearRoutineDraft();go("home");return;}
+    if(routineStarted&&mapStatus==="ready"){beginRoutine(followMode,false);return;}
+    go(mapStatus==="ready"?"look-brief":"face-scan");
+  };
+  useEffect(()=>{
+    if(!resumeExpiresAt||routineCompleted)return;
+    const timer=window.setTimeout(()=>setResumeClock(Date.now()),Math.max(0,resumeExpiresAt-Date.now())+50);
+    return()=>window.clearTimeout(timer);
+  },[resumeExpiresAt,routineCompleted]);
+  useEffect(()=>{
+    if(brief&&!routineCompleted&&resumeExpiresAt&&resumeExpiresAt<=resumeClock&&(view==="home"||view==="my-looks"))queueMicrotask(clearRoutineDraft);
+  },[brief,clearRoutineDraft,resumeClock,resumeExpiresAt,routineCompleted,view]);
   useEffect(()=>{
     let active=true;
     queueMicrotask(()=>{if(!active)return;try{const saved=window.localStorage.getItem(followModeKey);if(saved==="live"||saved==="slides"){setFollowMode(saved);setPreferredFollowMode(saved);}}catch{/* Use the live mirror default. */}});
@@ -423,7 +452,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       if(!response.ok)throw new Error(data.error||"The saved lesson could not be opened.");
       const restored=data.look?.brief as LookBrief|undefined;
       if(!restored||!Array.isArray(restored.steps)||!restored.steps.length)throw new Error("This saved lesson has no steps to open.");
-      setBrief(restored);setPreviewImage(look.preview_url||"");setSaveSessionPhotos(true);setSaveStatus("saved");setPrepPhoto("");setPrepFile(null);setMapStatus("idle");setCameraUnavailable(false);
+      setBrief(restored);armRoutineResume();setPreviewImage(look.preview_url||"");setSaveSessionPhotos(true);setSaveStatus("saved");setPrepPhoto("");setPrepFile(null);setMapStatus("idle");setCameraUnavailable(false);
       if(account.configured)await account.refresh();
       go("face-scan");
     }catch(error){setSavedLookError(error instanceof Error?error.message:"The saved lesson could not be opened.");}
@@ -477,7 +506,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Tutorial analysis failed. Please try again.");
       setLessonStage("Turning the analyzed sequence into your personalized steps…");
       const guide = data as Omit<LookBrief,"time"> & { estimatedMinutes:number };
-      setBrief({ ...guide, time:`${guide.estimatedMinutes} min`, sourceUrl:sourceUrl||undefined, sourceVideoAnalyzed:true });
+      setBrief({ ...guide, time:`${guide.estimatedMinutes} min`, sourceUrl:sourceUrl||undefined, sourceVideoAnalyzed:true });armRoutineResume();
       setSaveSessionPhotos(false);setSaveStatus("idle");
       if(account.configured)await account.refresh();
       setMirrorOpen(false);setStep(0);setCameraUnavailable(false);go("face-scan");
@@ -538,7 +567,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
 
   if(view==="creator")return <>{nav}<CreatorStudio onCancel={()=>go("home")}/></>;
 
-  if(view==="finished")return <main className="flow-screen finished-screen"><span aria-hidden="true">✓</span><h1>That’s the look.</h1><p>{activeLesson.length} applications, start to finish.</p><button className="primary" disabled={saveStatus==="saving"||saveStatus==="saved"} onClick={saveCurrentLook}>{saveStatus==="saved"?"Saved ✓":saveStatus==="saving"?"Saving…":"Save this look"}</button><button className="back" onClick={()=>go("home")}>{saveStatus==="saved"?"Back home":"Not this time"}</button><p>Saving keeps the lesson. Your scan is never stored.</p>{saveError&&<p className="error">{saveError}</p>}</main>;
+  if(view==="finished")return <main className="flow-screen finished-screen"><span aria-hidden="true">✓</span><h1>That’s the look.</h1><p>{activeLesson.length} applications, start to finish.</p><button className="primary" disabled={saveStatus==="saving"||saveStatus==="saved"} onClick={saveCurrentLook}>{saveStatus==="saved"?"Saved ✓":saveStatus==="saving"?"Saving…":"Save this look"}</button><button className="back" onClick={()=>{clearRoutineDraft();go("home");}}>{saveStatus==="saved"?"Back home":"Not this time"}</button><p>Saving keeps the lesson. Your scan is never stored.</p>{saveError&&<p className="error">{saveError}</p>}</main>;
   if (view === "session") {
     const placement = shape ? placementFor(shape) : null;
     const placementKey = currentLesson.technique as keyof ReturnType<typeof placementFor>;
@@ -546,7 +575,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     const blueprintPlacement = blueprintTechniqueNote(faceBlueprint,currentLesson.technique);
     const guidedSlides=followMode==="slides"&&!mirrorOpen;
     const moveToStep = (nextStep:number) => {
-      if(nextStep>=activeLesson.length){setMirrorOpen(false);go("finished");return;}
+      if(nextStep>=activeLesson.length){finishRoutine();return;}
       const target = Math.max(0,Math.min(activeLesson.length-1,nextStep));
       setStep(target);setTutorialClipOpen(false);setLessonPanelOpen(false);
     };
@@ -584,7 +613,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
                 experience:answers.level||"Not supplied",
               }}/>
               <div className="mirror-bottom-actions">
-                {step===activeLesson.length-1?<button className="mirror-next next-application" onClick={()=>{setMirrorOpen(false);go("finished");}} aria-label="Finish look">✓</button>:<button className="mirror-next next-application" onClick={()=>moveToStep(step+1)} aria-label="Next product">→</button>}
+                {step===activeLesson.length-1?<button className="mirror-next next-application" onClick={finishRoutine} aria-label="Finish look">✓</button>:<button className="mirror-next next-application" onClick={()=>moveToStep(step+1)} aria-label="Next product">→</button>}
               </div>
               <div className="mirror-toolbar" aria-label="Mirror controls">
                 <button onClick={()=>setLessonPanelOpen(true)} aria-label={`Open step details for ${currentLesson.product}`}><span>ⓘ</span>Details</button>
@@ -593,7 +622,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
                 <button onClick={()=>setCameraFacing(value=>value==="user"?"environment":"user")}><span>↻</span>Flip</button>
               </div>
             </div>:personalizedGuide()}
-            {!mirrorOpen&&<><nav className="slide-controls" aria-label="Guided slide controls"><button disabled={step===0} onClick={()=>moveToStep(step-1)} aria-label="Previous product">←</button><button className="slide-step" onClick={()=>setLessonPanelOpen(true)}>{step+1} / {activeLesson.length}<small>Details</small></button>{step===activeLesson.length-1?<button onClick={()=>{setMirrorOpen(false);go("finished");}} aria-label="Finish look">✓</button>:<button onClick={()=>moveToStep(step+1)} aria-label="Next product">→</button>}</nav><button className="slide-live-switch" onClick={()=>switchFollowMode("live")}><span>♪</span><b>Live coach</b><small>Tap for live guidance</small></button></>}
+            {!mirrorOpen&&<><nav className="slide-controls" aria-label="Guided slide controls"><button disabled={step===0} onClick={()=>moveToStep(step-1)} aria-label="Previous product">←</button><button className="slide-step" onClick={()=>setLessonPanelOpen(true)}>{step+1} / {activeLesson.length}<small>Details</small></button>{step===activeLesson.length-1?<button onClick={finishRoutine} aria-label="Finish look">✓</button>:<button onClick={()=>moveToStep(step+1)} aria-label="Next product">→</button>}</nav><button className="slide-live-switch" onClick={()=>switchFollowMode("live")}><span>♪</span><b>Live coach</b><small>Tap for live guidance</small></button></>}
             <div className="glam-face-caption"><span>{mirrorOpen?"Live mirror · on-device tracking":guidedSlides?"Your photo · placement guide":"Camera paused · scanned-face guide"}</span><b>{currentLesson.product} · {areaSummary(currentLesson)}</b></div>
           </section>
           <aside onTouchStart={e=>{swipeStart.current=e.touches[0].clientY;}} onTouchEnd={e=>{if(swipeStart.current!==null&&e.changedTouches[0].clientY-swipeStart.current>60)setLessonPanelOpen(false);swipeStart.current=null;}} className={`glam-lesson-card${lessonPanelOpen?" panel-open":" panel-closed"}`}>
@@ -614,7 +643,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
               {!mirrorOpen&&<div className="mirror-option"><div><b>{guidedSlides?"Guided slides":"Live mirror paused"}</b><span>{guidedSlides?"Step through on your photo with the same placement guides and animated arrows.":"Restart it whenever you are ready. Landmarks stay on this device; no camera frames are uploaded."}</span>{cameraUnavailable&&guidedSlides&&<span>Camera access was unavailable. You can try the live mirror again whenever you want.</span>}</div><button className="outline" onClick={()=>switchFollowMode("live")}>{guidedSlides?"Switch to live mirror":"Restart live mirror"}</button></div>}
               <div className="glam-actions">
                 <button className="outline" disabled={step===0} onClick={()=>moveToStep(step-1)}>← Previous</button>
-                {step===activeLesson.length-1?<button className="primary" onClick={()=>{setMirrorOpen(false);go("finished");}}>Finish look ✓</button>:<button className="primary" onClick={()=>moveToStep(step+1)}>Done—next product →</button>}
+                {step===activeLesson.length-1?<button className="primary" onClick={finishRoutine}>Finish look ✓</button>:<button className="primary" onClick={()=>moveToStep(step+1)}>Done—next product →</button>}
               </div>
             </div>
           </aside>
@@ -627,7 +656,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
 
   if(view==="discover")return <>{nav}<DiscoverFeed onCreate={()=>go("creator")}/></>;
 
-  if(view==="my-looks")return <>{nav}<main className="app-screen looks-screen page-enter"><header className="screen-heading"><div><p className="eyebrow">My Looks</p><h1>Your beauty shelf.</h1></div><p>Only looks you deliberately save sync to your private account. Opening a saved lesson uses one lesson credit. Bare-face scans are never stored.</p></header>{savedLookError&&<p className="form-error" role="alert">{savedLookError}</p>}<div className="cloud-look-grid">{brief&&!saveSessionPhotos&&<article className="saved-look-card current-look">{previewImage||prepPhoto?<img src={previewImage||prepPhoto} alt="Your current personalized look"/>:<div className="saved-look-placeholder">✦</div>}<div><small>CURRENT SESSION · NOT SAVED</small><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} tutorial steps</p><div><button className="outline" onClick={()=>go(mapStatus==="ready"?"look-brief":"face-scan")}>Review look</button><button className="primary" onClick={saveCurrentLook}>Save look</button></div></div></article>}{savedLooks.map(look=><article className="saved-look-card" key={look.id}>{look.preview_url?<img src={look.preview_url} alt={`${look.title} personalized preview`}/>:<div className="saved-look-placeholder">✦</div>}<div><small>SAVED PRIVATELY</small><h2>{look.title}</h2><p>{new Date(look.created_at).toLocaleDateString()} · Personalized lesson</p><div><button className="primary" disabled={Boolean(openingSavedLookId)} onClick={()=>void openSavedLook(look)}>{openingSavedLookId===look.id?"Checking your plan…":"Open look →"}</button><button className="text-button danger" disabled={Boolean(openingSavedLookId)} onClick={()=>void deleteSavedLook(look.id)}>Delete</button></div></div></article>)}</div>{!brief&&!savedLooks.length&&<section className="looks-empty"><span>♡</span><h2>Your first look starts with a tutorial.</h2><p>Paste a link or upload a permitted video, then Makeup Bestie will turn it into a personalized lesson.</p><button className="primary" onClick={()=>go("studio-intake")}>Create my first look →</button></section>}</main></>;
+  if(view==="my-looks")return <>{nav}<main className="app-screen looks-screen page-enter"><header className="screen-heading"><div><p className="eyebrow">My Looks</p><h1>Your beauty shelf.</h1></div><p>Only looks you deliberately save sync to your private account. Opening a saved lesson uses one lesson credit. Bare-face scans are never stored.</p></header>{savedLookError&&<p className="form-error" role="alert">{savedLookError}</p>}<div className="cloud-look-grid">{resumeAvailable&&brief&&!saveSessionPhotos&&<article className="saved-look-card current-look">{previewImage||prepPhoto?<img src={previewImage||prepPhoto} alt="Your current personalized look"/>:<div className="saved-look-placeholder">✦</div>}<div><small>CURRENT SESSION · NOT SAVED</small><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} tutorial steps</p><div><button className="outline" onClick={resumeRoutine}>Review look</button><button className="primary" onClick={saveCurrentLook}>Save look</button></div></div></article>}{savedLooks.map(look=><article className="saved-look-card" key={look.id}>{look.preview_url?<img src={look.preview_url} alt={`${look.title} personalized preview`}/>:<div className="saved-look-placeholder">✦</div>}<div><small>SAVED PRIVATELY</small><h2>{look.title}</h2><p>{new Date(look.created_at).toLocaleDateString()} · Personalized lesson</p><div><button className="primary" disabled={Boolean(openingSavedLookId)} onClick={()=>void openSavedLook(look)}>{openingSavedLookId===look.id?"Checking your plan…":"Open look →"}</button><button className="text-button danger" disabled={Boolean(openingSavedLookId)} onClick={()=>void deleteSavedLook(look.id)}>Delete</button></div></div></article>)}</div>{!resumeAvailable&&!savedLooks.length&&<section className="looks-empty"><span>♡</span><h2>Your first look starts with a tutorial.</h2><p>Paste a link or upload a permitted video, then Makeup Bestie will turn it into a personalized lesson.</p><button className="primary" onClick={()=>go("studio-intake")}>Create my first look →</button></section>}</main></>;
 
   if (view === "profile") {
     const savedLookCount = account.configured?savedLooks.length:(brief&&saveSessionPhotos?1:0);
@@ -659,7 +688,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const savedLookCount=savedLooks.length+(brief&&saveSessionPhotos?1:0);
   const plan=account.snapshot?.subscription?.plan;
   const lessonsLeft=plan==="unlimited"?"Unlimited":Math.max(0,15-(account.snapshot?.usage.tutorialAnalyses??0));
-  return <>{nav}<main className="home-dashboard app-screen"><header className="home-dashboard-header"><Logo home={()=>go("home")}/><button className="home-avatar" onClick={()=>go("profile")} aria-label="Open profile">{firstName.charAt(0).toUpperCase()}</button></header><section className="home-welcome"><p className="eyebrow">Hello {firstName},</p><h1>Ready for <em>your next look?</em></h1></section><section className="home-feature-card"><img src="/brand/home-feature.jpg" alt="Makeup Bestie makeup inspiration"/><div><h2>Turn any tutorial into <em>your routine.</em></h2><button className="home-feature-action" onClick={()=>setComposerOpen(true)}>Start a routine <span>→</span></button></div></section>{brief&&<section className="home-section"><p className="home-section-label">PICK UP WHERE YOU LEFT OFF</p><button className="home-continue-card" onClick={()=>go(mapStatus==="ready"?"look-brief":"face-scan")}><span className="home-continue-thumb"><img src="/brand/home-saved.jpg" alt="Saved everyday makeup look"/></span><span><b>{brief.title}</b><small>{mapStatus==="ready"?`${brief.steps.length} applications ready`:"Today’s face photo is next"}</small><i><span style={{width:mapStatus==="ready"?"100%":"45%"}}/></i></span><em>Continue →</em></button></section>}<section className="home-quick-grid"><button onClick={()=>go("my-looks")}><span><small>Saved looks</small><b>{savedLookCount} {savedLookCount===1?"routine":"routines"}</b><i>→</i></span><img src="/brand/home-saved.jpg" alt="A fair-skinned woman wearing a saved everyday look"/></button><button onClick={()=>go("profile")}><span><small>Face Blueprint</small><b>{faceBlueprint?"Your feature fit":"Ready after your first scan"}</b><i>→</i></span><img src="/brand/home-blueprint.jpg" alt="The app’s real on-device face mapping guide"/></button></section><button className="home-plan-row" onClick={()=>plan==="plus"?(setUpgradeOpen(true),setView("pricing")):go("profile")}><span>✦</span><b>{plan==="unlimited"?"Makeup Bestie Unlimited":"Makeup Bestie Plus"}</b><small>{plan==="unlimited"?"No monthly lesson limit":`${lessonsLeft} of 15 lessons left`}</small><i>›</i></button></main></>;
+  return <>{nav}<main className="home-dashboard app-screen"><header className="home-dashboard-header"><Logo home={()=>go("home")}/><button className="home-avatar" onClick={()=>go("profile")} aria-label="Open profile">{firstName.charAt(0).toUpperCase()}</button></header><section className="home-welcome"><p className="eyebrow">Hello {firstName},</p><h1>Ready for <em>your next look?</em></h1></section><section className="home-feature-card"><img src="/brand/home-feature.jpg" alt="Makeup Bestie makeup inspiration"/><div><h2>Turn any tutorial into <em>your routine.</em></h2><button className="home-feature-action" onClick={()=>setComposerOpen(true)}>Start a routine <span>→</span></button></div></section>{resumeAvailable&&brief&&<section className="home-section"><p className="home-section-label">PICK UP WHERE YOU LEFT OFF</p><button className="home-continue-card" onClick={resumeRoutine}><span className="home-continue-thumb"><img src="/brand/home-saved.jpg" alt="Saved everyday makeup look"/></span><span><b>{brief.title}</b><small>{routineStarted?`Step ${Math.min(step+1,brief.steps.length)} of ${brief.steps.length} · expires after 2 hours`:(mapStatus==="ready"?`${brief.steps.length} applications ready · expires after 2 hours`:"Today’s face photo is next · expires after 2 hours")}</small><i><span style={{width:routineStarted?`${Math.round(((step+1)/brief.steps.length)*100)}%`:mapStatus==="ready"?"70%":"35%"}}/></i></span><em>Continue →</em></button></section>}<section className="home-quick-grid"><button onClick={()=>go("my-looks")}><span><small>Saved looks</small><b>{savedLookCount} {savedLookCount===1?"routine":"routines"}</b><i>→</i></span><img src="/brand/home-saved.jpg" alt="A fair-skinned woman wearing a saved everyday look"/></button><button onClick={()=>go("profile")}><span><small>Face Blueprint</small><b>{faceBlueprint?"Your feature fit":"Ready after your first scan"}</b><i>→</i></span><img src="/brand/home-blueprint.jpg" alt="The app’s real on-device face mapping guide"/></button></section><button className="home-plan-row" onClick={()=>plan==="plus"?(setUpgradeOpen(true),setView("pricing")):go("profile")}><span>✦</span><b>{plan==="unlimited"?"Makeup Bestie Unlimited":"Makeup Bestie Plus"}</b><small>{plan==="unlimited"?"No monthly lesson limit":`${lessonsLeft} of 15 lessons left`}</small><i>›</i></button></main></>;
 }
 
 export default function App() {
