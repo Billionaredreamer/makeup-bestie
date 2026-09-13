@@ -542,7 +542,6 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       {activeLesson.slice(0,step).map((item,index)=><PlacementGuide key={`${item.product}-${index}`} id={`complete-${compact?"pip-":""}${index}`} soft focused stepNumber={index+1} points={facePoints} areas={stepAreas(item)} technique={item.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect} displayAspect={compact?undefined:lessonDisplayAspect}/>)}
       <PlacementGuide id={compact?"lesson-pip":"lesson"} focused points={facePoints} areas={stepAreas(currentLesson)} technique={currentLesson.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect} displayAspect={compact?undefined:lessonDisplayAspect} stepNumber={step+1} paused={!guideMotion}/>
       {!compact&&<button className="guide-motion-toggle" aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Ⅱ Pause arrows":"▶ Animate arrows"}</button>}
-      {!compact&&<div className="placement-key"><span/><b>{currentLesson.product}</b><small>Outline = where it goes · arrows = which way to blend</small></div>}
     </div>;
     return <>
       {nav}
@@ -571,13 +570,17 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
                 skinTone:answers.tone||"Not supplied",
                 experience:answers.level||"Not supplied",
               }}/>
-              <button className="mirror-product" onClick={()=>setLessonPanelOpen(true)}>{currentLesson.product} ⓘ</button><div className="mirror-toolbar" aria-label="Mirror controls">
-                <button disabled={step===0} onClick={()=>moveToStep(step-1)}><span>←</span>Previous</button>
-                {step===activeLesson.length-1?<button className="next-application" onClick={()=>{setMirrorOpen(false);go("finished");}}><span>✓</span>Finish look</button>:<button className="next-application" onClick={()=>moveToStep(step+1)}><span>→</span>Next product</button>}
-                <button className="stop-camera" onClick={()=>switchFollowMode("slides")}><span>▦</span>Switch to guided slides</button>
+              <div className="mirror-bottom-actions">
+                <button className="mirror-product" onClick={()=>setLessonPanelOpen(true)} aria-label={`Open notes for ${currentLesson.product}`}><b>{currentLesson.product}</b><small>{areaSummary(currentLesson)} · Tap for notes</small></button>
+                {step===activeLesson.length-1?<button className="mirror-next next-application" onClick={()=>{setMirrorOpen(false);go("finished");}} aria-label="Finish look">✓</button>:<button className="mirror-next next-application" onClick={()=>moveToStep(step+1)} aria-label="Next product">→</button>}
+              </div>
+              <div className="mirror-toolbar" aria-label="Mirror controls">
+                <button disabled={step===0} onClick={()=>moveToStep(step-1)}><span>←</span>Back</button>
+                <button className="stop-camera" onClick={()=>switchFollowMode("slides")}><span>▦</span>Slides</button>
+                <button onClick={()=>setCameraFacing(value=>value==="user"?"environment":"user")}><span>↻</span>Flip</button>
               </div>
             </div>:personalizedGuide()}
-            {!mirrorOpen&&<nav className="slide-controls" aria-label="Guided slide controls"><button disabled={step===0} onClick={()=>moveToStep(step-1)} aria-label="Previous product">←</button><button className="slide-step" onClick={()=>setLessonPanelOpen(true)}>{step+1} / {activeLesson.length}<small>Details</small></button>{step===activeLesson.length-1?<button onClick={()=>{setMirrorOpen(false);go("finished");}} aria-label="Finish look">✓</button>:<button onClick={()=>moveToStep(step+1)} aria-label="Next product">→</button>}<button className="slide-switch" onClick={()=>switchFollowMode("live")}>◉ <span>Live</span></button></nav>}
+            {!mirrorOpen&&<><nav className="slide-controls" aria-label="Guided slide controls"><button disabled={step===0} onClick={()=>moveToStep(step-1)} aria-label="Previous product">←</button><button className="slide-step" onClick={()=>setLessonPanelOpen(true)}>{step+1} / {activeLesson.length}<small>Details</small></button>{step===activeLesson.length-1?<button onClick={()=>{setMirrorOpen(false);go("finished");}} aria-label="Finish look">✓</button>:<button onClick={()=>moveToStep(step+1)} aria-label="Next product">→</button>}</nav><button className="slide-live-switch" onClick={()=>switchFollowMode("live")}><span>♪</span><b>Live coach</b><small>Tap for live guidance</small></button></>}
             <div className="glam-face-caption"><span>{mirrorOpen?"Live mirror · on-device tracking":guidedSlides?"Your photo · placement guide":"Camera paused · scanned-face guide"}</span><b>{currentLesson.product} · {areaSummary(currentLesson)}</b></div>
           </section>
           <aside onTouchStart={e=>{swipeStart.current=e.touches[0].clientY;}} onTouchEnd={e=>{if(swipeStart.current!==null&&e.changedTouches[0].clientY-swipeStart.current>60)setLessonPanelOpen(false);swipeStart.current=null;}} className={`glam-lesson-card${lessonPanelOpen?" panel-open":" panel-closed"}`}>

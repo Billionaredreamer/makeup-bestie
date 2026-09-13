@@ -607,13 +607,13 @@
 /* Dashed outline, lightly filled: a makeup artist's chart drawn over the photo.
    Strokes do not scale with the SVG, so they stay crisp at any photo size. */
 .placement-overlay .placement-zone {
-  fill: currentColor; fill-opacity: .17;
-  stroke: currentColor; stroke-width: 2.1; stroke-dasharray: 7 5; stroke-linejoin: round;
+  fill: currentColor; fill-opacity: .12;
+  stroke: currentColor; stroke-width: 1.45; stroke-dasharray: 6 5; stroke-linejoin: round;
   filter: drop-shadow(0 0 2px rgba(255,250,244,.7)) drop-shadow(0 1px 3px rgba(38,22,18,.45));
   animation: placement-breathe 2.6s ease-in-out infinite;
 }
 .placement-overlay .application-arrow {
-  fill: none; stroke: #fffaf4; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 11 7;
+  fill: none; stroke: #fffaf4; stroke-width: 1.75; stroke-linecap: round; stroke-dasharray: 8 6;
   filter: drop-shadow(0 1px 3px rgba(38,22,18,.65));
   animation: arrow-travel 1.15s linear infinite;
 }
@@ -630,7 +630,7 @@
 .zone-badge { position: absolute; transform: translate(-50%,-50%); color: var(--zone, #d77e80); }
 /* The disc is filled with the zone ink, not currentColor: the number itself is
    cream, and currentColor would paint the disc cream too. */
-.zone-badge b { display: grid; place-items: center; width: 22px; height: 22px; border: 1.5px solid rgba(255,250,244,.9); border-radius: 50%; background: var(--zone, #d77e80); color: #fffaf4; font: 700 10px/1 Georgia, serif; box-shadow: 0 3px 10px rgba(38,22,18,.45); }
+.zone-badge b { display: grid; place-items: center; width: 18px; height: 18px; border: 1.2px solid rgba(255,250,244,.9); border-radius: 50%; background: var(--zone, #d77e80); color: #fffaf4; font: 700 8px/1 Georgia, serif; box-shadow: 0 3px 10px rgba(38,22,18,.4); }
 .zone-badge small { position: absolute; top: 50%; padding: 4px 8px; border-radius: 99px; background: rgba(43,27,23,.82); color: #fffaf4; font-size: 8px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; backdrop-filter: blur(6px); }
 .zone-badge.side-left small { right: calc(100% + 7px); transform: translateY(-50%); }
 .zone-badge.side-right small { left: calc(100% + 7px); transform: translateY(-50%); }

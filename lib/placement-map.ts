@@ -617,15 +617,19 @@ function jawZone(a: FaceAnchors, side: Side): PlacementZone {
 
 function fullFaceZone(a: FaceAnchors, technique: Technique): PlacementZone {
   const center = pt(a.centerX, (a.top.y + a.chin.y) / 2);
+  const leftStart = pt(center.x - a.width * 0.035, center.y - a.height * 0.025);
+  const rightStart = pt(center.x + a.width * 0.035, center.y - a.height * 0.025);
   return {
     id: `${technique}-face`, label: technique === "prep" ? "Whole face" : "Complexion", side: 0,
     outline: smooth(a.oval, true),
-    // Base products are pressed at the centre and moved outward to the hairline.
+    // Use short, local sweeps instead of a giant cross over the whole face.
+    // The outline still communicates full-face coverage while each arrow stays
+    // readable on a phone-sized live mirror.
     arrows: [
-      arrow(center, pt(a.edgeL.x + a.width * 0.06, center.y - a.height * 0.06), 0.06),
-      arrow(center, pt(a.edgeR.x - a.width * 0.06, center.y - a.height * 0.06), -0.06),
-      arrow(center, pt(a.centerX, a.top.y + a.height * 0.1), 0.04),
-      arrow(center, pt(a.centerX, a.chin.y - a.height * 0.08), -0.04),
+      arrow(leftStart, pt(a.edgeL.x + a.width * 0.15, center.y - a.height * 0.07), 0.045),
+      arrow(rightStart, pt(a.edgeR.x - a.width * 0.15, center.y - a.height * 0.07), -0.045),
+      arrow(pt(a.centerX, center.y - a.height * 0.07), pt(a.centerX, a.top.y + a.height * 0.2), 0.025),
+      arrow(pt(a.centerX, center.y + a.height * 0.055), pt(a.centerX, a.chin.y - a.height * 0.17), -0.025),
     ],
     anchor: center,
   };

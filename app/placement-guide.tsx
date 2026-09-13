@@ -60,8 +60,8 @@ export function PlacementGuide({
       role="img" aria-label={soft ? `Completed: ${description}` : `Where to apply — ${description}`}
     >
       <defs>
-        <marker id={markerId} markerWidth="4.6" markerHeight="4.6" refX="3.3" refY="1.7" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L0,3.4 L4,1.7 z" />
+        <marker id={markerId} markerWidth="3.4" markerHeight="3.4" refX="2.6" refY="1.25" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L0,2.5 L3,1.25 z" />
         </marker>
       </defs>
       {zones.map(zone => <g key={zone.id}>

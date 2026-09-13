@@ -175,7 +175,11 @@ export function LiveCoach({ context }: { context: LiveCoachContext }) {
 
   return <div className={`live-coach-dock ${active ? "active" : ""} status-${status}`}>
     <audio ref={audioRef} autoPlay aria-hidden="true"/>
-    <button className="coach-dot" aria-label={!active?"Start live coach":status==="paused"?"Resume coach":"Pause coach"} aria-busy={status==="requesting"||status==="connecting"} onClick={()=>{if(active)togglePause();else void start();}}/>
+    <button className="coach-dot" aria-label={!active?"Start live coach":status==="paused"?"Resume coach":"Pause coach"} aria-busy={status==="requesting"||status==="connecting"} onClick={()=>{if(active)togglePause();else void start();}}>
+      <span aria-hidden="true">♪</span>
+      <b>Live coach</b>
+      <small>{status==="off"||status==="error"?"Tap for live guidance":statusCopy[status]}</small>
+    </button>
     <span className="sr-only" role="status">{statusCopy[status]}</span>
     {active&&<><p className="coach-hint">Ask anything about this step</p><div className="coach-controls"><button aria-pressed={muted} onClick={toggleMute}>{muted?"Unmute":"Mute"}</button><button className="coach-end" onClick={stop}>End</button><button className="sr-only" onClick={repeat}>Repeat instruction</button></div></>}
     {error&&<p className="coach-error" role="alert">{error}</p>}
