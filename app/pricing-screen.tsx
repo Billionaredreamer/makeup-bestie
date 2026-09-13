@@ -40,17 +40,17 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
     void poll();
     return()=>{cancelled=true;window.clearTimeout(timer);};
   },[onRefresh]);
-  const waitForEntitlement=async(plan:SubscriptionPlan)=>{
-    for(let attempt=0;attempt<19&&mounted.current;attempt+=1){
+  const waitForEntitlement=async(plan:SubscriptionPlan,attempts=8)=>{
+    for(let attempt=0;attempt<attempts&&mounted.current;attempt+=1){
       const snapshot=await onRefresh().catch(()=>null);
       const matches=subscriptionRecordIsActive(snapshot?.subscription)&&(plan!=="unlimited"||snapshot?.subscription?.plan==="unlimited");
       if(matches)return true;
-      await new Promise(resolve=>window.setTimeout(resolve,attempt<10?1500:5000));
+      if(attempt<attempts-1)await new Promise(resolve=>window.setTimeout(resolve,750));
     }
     return false;
   };
   const recoverRevenueCatEntitlement=async()=>{
-    const response=await fetch("/api/billing/revenuecat-restore",{method:"POST",signal:AbortSignal.timeout(15_000)});
+    const response=await fetch("/api/billing/revenuecat-restore",{method:"POST",signal:AbortSignal.timeout(8_000)});
     const data=await readBillingPayload(response);
     if(!response.ok)throw new Error(data.error||"The restored purchase could not be linked to your account.");
   };
@@ -65,15 +65,13 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
     try{
       const activePlan=await purchasePlan(plan);
       if(!activePlan)throw new Error("The purchase did not complete. Please try again.");
-      // Apple confirms the purchase on the device immediately, but entitlement
-      // is granted server-side by the RevenueCat webhook, so the subscriptions
-      // row can lag by several seconds. Refreshing once raced that webhook and
-      // left the buyer sitting on the paywall with no error and no way out.
-      // Poll on the same schedule the Stripe path already uses.
+      // RevenueCat has already returned an active entitlement here. Sync it to
+      // Supabase immediately instead of making the buyer wait nearly a minute
+      // for the webhook-first polling path. The webhook remains the durable
+      // source of future renewals, cancellations and transfers.
       setConfirming(true);
-      if(await waitForEntitlement(plan))return;
+      await recoverRevenueCatEntitlement().catch(()=>undefined);
       if(!mounted.current)return;
-      await recoverRevenueCatEntitlement();
       if(await waitForEntitlement(plan))return;
       setConfirming(false);
       setError("Your purchase went through, but activation is taking longer than expected. Tap Restore purchases — you will not be charged twice.");
