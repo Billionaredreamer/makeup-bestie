@@ -135,9 +135,9 @@
 .minimalist-mirror .mirror-bottom-actions {
   position:absolute;
   z-index:31;
-  right:max(14px,var(--safe-right));
-  bottom:calc(max(14px,var(--safe-bottom)) + 2px);
-  left:max(14px,var(--safe-left));
+  right:max(20px,calc(var(--safe-right) + 14px));
+  bottom:max(20px,calc(var(--safe-bottom) + 14px));
+  left:max(20px,calc(var(--safe-left) + 14px));
   display:grid;
   grid-template-columns:minmax(0,1fr) 58px;
   align-items:center;
@@ -147,13 +147,14 @@
 .minimalist-mirror .mirror-product {
   position:static;
   display:grid;
-  justify-self:start;
+  justify-self:stretch;
   gap:2px;
-  width:auto;
-  max-width:min(76vw,330px);
+  width:100%;
+  min-width:0;
+  max-width:none;
   height:auto;
   min-height:48px;
-  padding:8px 15px;
+  padding:9px 17px;
   transform:none;
   border:1px solid rgba(255,255,255,.22);
   border-radius:99px;
@@ -351,7 +352,7 @@
 }
 
 @media (max-width:380px) {
-  .minimalist-mirror .mirror-bottom-actions { grid-template-columns:minmax(0,1fr) 52px;gap:8px; }
+  .minimalist-mirror .mirror-bottom-actions { right:max(14px,calc(var(--safe-right) + 10px));left:max(14px,calc(var(--safe-left) + 10px));grid-template-columns:minmax(0,1fr) 52px;gap:8px; }
   .minimalist-mirror .mirror-next { width:52px;height:52px; }
   .minimalist-mirror .mirror-toolbar { right:max(7px,var(--safe-right)); }
   .minimalist-mirror .mirror-toolbar button,
