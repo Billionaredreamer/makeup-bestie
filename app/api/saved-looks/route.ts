@@ -13,7 +13,9 @@ export async function GET() {
   const supabase = await createSupabaseServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
-  const { data, error } = await supabase.from("saved_looks").select("id,title,tutorial_source,brief,preview_path,created_at").eq("user_id",auth.user.id).order("created_at",{ascending:false});
+  // Keep the lesson itself behind the metered replay endpoint. The shelf only
+  // needs metadata and a private preview to render each saved-look card.
+  const { data, error } = await supabase.from("saved_looks").select("id,title,tutorial_source,preview_path,created_at").eq("user_id",auth.user.id).order("created_at",{ascending:false});
   if (error) return NextResponse.json({ error: "Saved looks could not be loaded." }, { status: 500 });
   const looks = await Promise.all((data||[]).map(async look=>{
     let preview_url:string|null=null;

@@ -237,6 +237,9 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
   const [previewIntensity, setPreviewIntensity] = useState<"soft"|"reference"|"dramatic">("reference");
   const [tutorialVideoUrl, setTutorialVideoUrl] = useState("");
   const [savedLooks,setSavedLooks]=useState<SavedLookRecord[]>([]);
+  const [openingSavedLookId,setOpeningSavedLookId]=useState<string|null>(null);
+  const openingSavedLookRef=useRef(false);
+  const [savedLookError,setSavedLookError]=useState("");
   const [saveStatus,setSaveStatus]=useState<"idle"|"saving"|"saved"|"error">("idle");
   const [saveError,setSaveError]=useState("");
   const [profileSaveError,setProfileSaveError]=useState("");
@@ -411,10 +414,21 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
       setSaveSessionPhotos(true);setSaveStatus("saved");await loadSavedLooks();
     }catch(error){setSaveStatus("error");setSaveError(error instanceof Error?error.message:"The look could not be saved.");}
   };
-  const openSavedLook=(look:SavedLookRecord)=>{
-    const restored=look.brief as unknown as LookBrief;
-    if(!Array.isArray(restored.steps)||!restored.steps.length)return;
-    setBrief(restored);setPreviewImage(look.preview_url||"");setSaveSessionPhotos(true);setSaveStatus("saved");setPrepPhoto("");setPrepFile(null);setMapStatus("idle");setCameraUnavailable(false);go("face-scan");
+  const openSavedLook=async(look:SavedLookRecord)=>{
+    if(openingSavedLookRef.current)return;
+    openingSavedLookRef.current=true;
+    setOpeningSavedLookId(look.id);setSavedLookError("");
+    try{
+      const response=await fetch("/api/saved-looks/replay",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:look.id})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.error||"The saved lesson could not be opened.");
+      const restored=data.look?.brief as LookBrief|undefined;
+      if(!restored||!Array.isArray(restored.steps)||!restored.steps.length)throw new Error("This saved lesson has no steps to open.");
+      setBrief(restored);setPreviewImage(look.preview_url||"");setSaveSessionPhotos(true);setSaveStatus("saved");setPrepPhoto("");setPrepFile(null);setMapStatus("idle");setCameraUnavailable(false);
+      if(account.configured)await account.refresh();
+      go("face-scan");
+    }catch(error){setSavedLookError(error instanceof Error?error.message:"The saved lesson could not be opened.");}
+    finally{openingSavedLookRef.current=false;setOpeningSavedLookId(null);}
   };
   const deleteSavedLook=async(id:string)=>{
     const response=await fetch(`/api/saved-looks?id=${encodeURIComponent(id)}`,{method:"DELETE"});
@@ -614,7 +628,7 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
 
   if(view==="discover")return <>{nav}<DiscoverFeed onCreate={()=>go("creator")}/></>;
 
-  if(view==="my-looks")return <>{nav}<main className="app-screen looks-screen page-enter"><header className="screen-heading"><div><p className="eyebrow">My Looks</p><h1>Your beauty shelf.</h1></div><p>Only looks you deliberately save sync to your private account. Bare-face scans are never stored.</p></header><div className="cloud-look-grid">{brief&&!saveSessionPhotos&&<article className="saved-look-card current-look">{previewImage||prepPhoto?<img src={previewImage||prepPhoto} alt="Your current personalized look"/>:<div className="saved-look-placeholder">✦</div>}<div><small>CURRENT SESSION · NOT SAVED</small><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} tutorial steps</p><div><button className="outline" onClick={()=>go(mapStatus==="ready"?"look-brief":"face-scan")}>Review look</button><button className="primary" onClick={saveCurrentLook}>Save look</button></div></div></article>}{savedLooks.map(look=><article className="saved-look-card" key={look.id}>{look.preview_url?<img src={look.preview_url} alt={`${look.title} personalized preview`}/>:<div className="saved-look-placeholder">✦</div>}<div><small>SAVED PRIVATELY</small><h2>{look.title}</h2><p>{new Date(look.created_at).toLocaleDateString()} · Personalized lesson</p><div><button className="primary" onClick={()=>openSavedLook(look)}>Open look →</button><button className="text-button danger" onClick={()=>void deleteSavedLook(look.id)}>Delete</button></div></div></article>)}</div>{!brief&&!savedLooks.length&&<section className="looks-empty"><span>♡</span><h2>Your first look starts with a tutorial.</h2><p>Paste a link or upload a permitted video, then Makeup Bestie will turn it into a personalized lesson.</p><button className="primary" onClick={()=>go("studio-intake")}>Create my first look →</button></section>}</main></>;
+  if(view==="my-looks")return <>{nav}<main className="app-screen looks-screen page-enter"><header className="screen-heading"><div><p className="eyebrow">My Looks</p><h1>Your beauty shelf.</h1></div><p>Only looks you deliberately save sync to your private account. Opening a saved lesson uses one lesson credit. Bare-face scans are never stored.</p></header>{savedLookError&&<p className="form-error" role="alert">{savedLookError}</p>}<div className="cloud-look-grid">{brief&&!saveSessionPhotos&&<article className="saved-look-card current-look">{previewImage||prepPhoto?<img src={previewImage||prepPhoto} alt="Your current personalized look"/>:<div className="saved-look-placeholder">✦</div>}<div><small>CURRENT SESSION · NOT SAVED</small><h2>{brief.title}</h2><p>{brief.difficulty} · {brief.time} · {brief.steps.length} tutorial steps</p><div><button className="outline" onClick={()=>go(mapStatus==="ready"?"look-brief":"face-scan")}>Review look</button><button className="primary" onClick={saveCurrentLook}>Save look</button></div></div></article>}{savedLooks.map(look=><article className="saved-look-card" key={look.id}>{look.preview_url?<img src={look.preview_url} alt={`${look.title} personalized preview`}/>:<div className="saved-look-placeholder">✦</div>}<div><small>SAVED PRIVATELY</small><h2>{look.title}</h2><p>{new Date(look.created_at).toLocaleDateString()} · Personalized lesson</p><div><button className="primary" disabled={Boolean(openingSavedLookId)} onClick={()=>void openSavedLook(look)}>{openingSavedLookId===look.id?"Checking your plan…":"Open look →"}</button><button className="text-button danger" disabled={Boolean(openingSavedLookId)} onClick={()=>void deleteSavedLook(look.id)}>Delete</button></div></div></article>)}</div>{!brief&&!savedLooks.length&&<section className="looks-empty"><span>♡</span><h2>Your first look starts with a tutorial.</h2><p>Paste a link or upload a permitted video, then Makeup Bestie will turn it into a personalized lesson.</p><button className="primary" onClick={()=>go("studio-intake")}>Create my first look →</button></section>}</main></>;
 
   if (view === "profile") {
     const savedLookCount = account.configured?savedLooks.length:(brief&&saveSessionPhotos?1:0);

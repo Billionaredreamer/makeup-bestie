@@ -32,7 +32,6 @@ export type SavedLookRecord = {
   id: string;
   title: string;
   tutorial_source: string | null;
-  brief: Record<string, unknown>;
   preview_url: string | null;
   created_at: string;
 };

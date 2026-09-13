@@ -110,7 +110,7 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
       </ul>
       <fieldset className="paywall-plans" disabled={unavailable}>
         <legend className="sr-only">Choose your monthly plan</legend>
-        <label className={selectedPlan==="plus"?"selected":""}><input type="radio" name="plan" value="plus" checked={selectedPlan==="plus"} onChange={()=>setSelectedPlan("plus")}/><span><b>Plus</b><small>15 adaptations / month</small></span><span className="paywall-price"><b>$12.99</b><small>/month</small></span></label>
+        <label className={selectedPlan==="plus"?"selected":""}><input type="radio" name="plan" value="plus" checked={selectedPlan==="plus"} onChange={()=>setSelectedPlan("plus")}/><span><b>Plus</b><small>15 new or saved lesson sessions / month</small></span><span className="paywall-price"><b>$12.99</b><small>/month</small></span></label>
         <label className={selectedPlan==="unlimited"?"selected":""}><input type="radio" name="plan" value="unlimited" checked={selectedPlan==="unlimited"} onChange={()=>setSelectedPlan("unlimited")}/><span><b>Unlimited</b><small>No monthly limit · personal use</small></span><span className="paywall-price"><b>$49.99</b><small>/month</small></span></label>
       </fieldset>
       <footer className="paywall-bottom">

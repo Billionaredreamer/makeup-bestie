@@ -1362,3 +1362,13 @@ body.glam-room-open { background: #170e0c; }
   .peek-controls { min-height: 80px; padding-block: var(--space-2); }
   .peek-controls > .primary { min-height: 44px; }
 }
+
+.form-error {
+  margin: 0 0 var(--space-4);
+  padding: 11px;
+  border: 1px solid #e7b3a8;
+  border-radius: 12px;
+  background: #fff0ec;
+  color: #a63f35;
+  font-size: 12px;
+}
