@@ -9,6 +9,9 @@ import "./launch-polish.css";
 export const metadata: Metadata = {
   title: "Makeup Bestie — Your artist, your hype woman",
   description: "Personalized makeup guidance built around your face, your products, and your pace.",
+  appleWebApp: {
+    title: "Makeup Bestie",
+  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
