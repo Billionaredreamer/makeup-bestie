@@ -5,6 +5,7 @@ import type { AccountSnapshot, SubscriptionPlan } from "@/lib/account-types";
 import { isNativeIOSApp } from "@/lib/platform";
 import { configureRevenueCat, purchasePlan, restorePurchases } from "@/lib/revenuecat";
 import { subscriptionRecordIsActive } from "@/lib/onboarding-flow";
+import { PLUS_ALLOWANCE_COPY, UNLIMITED_ALLOWANCE_COPY } from "@/lib/subscription-copy";
 
 type BillingPayload = { error?: string; url?: string };
 
@@ -100,22 +101,33 @@ export function PricingScreen({account,onRefresh,onSignOut}:{account:AccountSnap
   return <main className="launch-paywall">
     <div className="paywall-content">
       <header className="paywall-top"><span className="paywall-mark" aria-hidden="true">m</span><button className="paywall-close" onClick={onSignOut} disabled={unavailable} aria-label="Close and sign out" title="Close and sign out">×</button></header>
-      <h1>Unlock your <em>bestie.</em></h1>
+      <section className="paywall-heading">
+        <p className="eyebrow">Your artist. Your pace.</p>
+        <h1>Unlock your <em>bestie.</em></h1>
+        <p>Turn the looks you love into guidance made for your face.</p>
+      </section>
       <ul className="paywall-benefits">
-        <li><span aria-hidden="true">✦</span>Any tutorial, rebuilt for your face</li>
-        <li><span aria-hidden="true">✦</span>Step-by-step in the Glam Room, with placement guides</li>
-        <li><span aria-hidden="true">✦</span>Your bestie on voice, hands-free</li>
+        <li><span aria-hidden="true">✦</span><b>Face Blueprint</b><small>Guidance shaped around your features</small></li>
+        <li><span aria-hidden="true">✦</span><b>Full Glam Room</b><small>Placement guides, slides and Live Coach</small></li>
+        <li><span aria-hidden="true">✦</span><b>Private beauty shelf</b><small>Save the routines you want to keep</small></li>
       </ul>
       <fieldset className="paywall-plans" disabled={unavailable}>
         <legend className="sr-only">Choose your monthly plan</legend>
-        <label className={selectedPlan==="plus"?"selected":""}><input type="radio" name="plan" value="plus" checked={selectedPlan==="plus"} onChange={()=>setSelectedPlan("plus")}/><span><b>Plus</b><small>15 new or saved lesson sessions / month</small></span><span className="paywall-price"><b>$12.99</b><small>/month</small></span></label>
-        <label className={selectedPlan==="unlimited"?"selected":""}><input type="radio" name="plan" value="unlimited" checked={selectedPlan==="unlimited"} onChange={()=>setSelectedPlan("unlimited")}/><span><b>Unlimited</b><small>No monthly limit · personal use</small></span><span className="paywall-price"><b>$49.99</b><small>/month</small></span></label>
+        <label className={selectedPlan==="plus"?"selected":""}><input type="radio" name="plan" value="plus" checked={selectedPlan==="plus"} onChange={()=>setSelectedPlan("plus")}/><span className="paywall-plan-copy"><span><b>Makeup Bestie Plus</b>{selectedPlan==="plus"&&<em>Selected</em>}</span><small>{PLUS_ALLOWANCE_COPY}</small></span><span className="paywall-price"><b>$12.99</b><small>per month</small></span></label>
+        <label className={selectedPlan==="unlimited"?"selected":""}><input type="radio" name="plan" value="unlimited" checked={selectedPlan==="unlimited"} onChange={()=>setSelectedPlan("unlimited")}/><span className="paywall-plan-copy"><span><b>Makeup Bestie Unlimited</b>{selectedPlan==="unlimited"&&<em>Selected</em>}</span><small>{UNLIMITED_ALLOWANCE_COPY}<br/>for personal use</small></span><span className="paywall-price"><b>$49.99</b><small>per month</small></span></label>
       </fieldset>
+      <section className="paywall-comparison" aria-label="Plan comparison">
+        <div className="paywall-comparison-head"><b>What’s included</b><span>Plus</span><span>Unlimited</span></div>
+        <div><span>New routines + replays</span><b>15 total</b><b>Unlimited</b></div>
+        <div><span>Beauty profile + saved looks</span><b>✓</b><b>✓</b></div>
+        <div><span>Full Glam Room + Live Coach</span><b>✓</b><b>✓</b></div>
+      </section>
+      <p className="paywall-shared-note">Both plans include your private beauty profile, saved looks and full Glam Room access.</p>
       <footer className="paywall-bottom">
         {confirming&&<p className="paywall-message" role="status">Payment received. We’re securely activating your plan…</p>}
         {error&&<p className="paywall-message" role="alert">{error}</p>}
         <button className="primary paywall-subscribe" disabled={unavailable} onClick={()=>checkout(selectedPlan)}>{storeInitializing?"Connecting to the App Store…":busy?(nativeIOS?"Opening the App Store…":"Opening checkout…"):account.subscription?.plan==="plus"&&selectedPlan==="unlimited"?"Upgrade to Unlimited":"Subscribe"}</button>
-        <p className="paywall-renewal">Renews monthly until cancelled. {nativeIOS?"Billed through your Apple ID. Cancel anytime in Settings → Apple ID → Subscriptions.":"Cancel anytime from Profile → Manage subscription."}</p>
+        <p className="paywall-renewal">{nativeIOS?"Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically unless auto-renew is turned off at least 24 hours before the end of the current period. Your account is charged for renewal within 24 hours prior to the end of the current period. You can manage or cancel your subscription in your Apple ID account settings at any time.":"Payment is handled securely by Stripe. Subscriptions renew monthly until cancelled. Manage or cancel anytime from Profile → Manage subscription."}</p>
         <nav className="paywall-legal" aria-label="Subscription information">
           {nativeIOS&&<button disabled={unavailable} onClick={restore}>{restoring?"Restoring…":"Restore purchases"}</button>}
           <a href="/terms">Terms</a><a href="/privacy">Privacy</a>
