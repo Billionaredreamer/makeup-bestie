@@ -6,7 +6,7 @@ import { isNativeIOSApp } from "@/lib/platform";
 export type SocialProvider = "apple" | "google";
 
 const GOOGLE_WEB_CLIENT_ID = "70136674621-i47hl8idmfg9euc3i0ua26h7egao3hl9.apps.googleusercontent.com";
-const GOOGLE_IOS_CLIENT_ID = "70136674621-h8n2tadheesbk68uf64hhaea7mje57lv.apps.googleusercontent.com";
+const GOOGLE_IOS_CLIENT_ID = "70136674621-h8n2tadheesbk68uf64hhaea7mje571v.apps.googleusercontent.com";
 
 export class SocialAuthCancelledError extends Error {
   constructor() {

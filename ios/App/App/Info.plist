@@ -15,7 +15,7 @@
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>GIDClientID</key>
-	<string>70136674621-h8n2tadheesbk68uf64hhaea7mje57lv.apps.googleusercontent.com</string>
+	<string>70136674621-h8n2tadheesbk68uf64hhaea7mje571v.apps.googleusercontent.com</string>
 	<key>GIDServerClientID</key>
 	<string>70136674621-i47hl8idmfg9euc3i0ua26h7egao3hl9.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
@@ -25,7 +25,7 @@
 			<string>Google Sign-In</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.70136674621-h8n2tadheesbk68uf64hhaea7mje57lv</string>
+				<string>com.googleusercontent.apps.70136674621-h8n2tadheesbk68uf64hhaea7mje571v</string>
 			</array>
 		</dict>
 	</array>
