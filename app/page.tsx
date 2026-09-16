@@ -583,7 +583,6 @@ function MakeupBestieExperience({account}:{account:LaunchAccount}) {
     };
     const personalizedGuide=(compact=false)=><div className={`glam-face${compact?" compact-guide":""}`} style={compact?{aspectRatio:String(photoAspect)}:undefined}>
       <img src={prepPhoto} alt="Your face with a personalized makeup placement guide"/>
-      {activeLesson.slice(0,step).map((item,index)=><PlacementGuide key={`${item.product}-${index}`} id={`complete-${compact?"pip-":""}${index}`} soft focused stepNumber={index+1} points={facePoints} areas={stepAreas(item)} technique={item.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect} displayAspect={compact?undefined:lessonDisplayAspect}/>)}
       <PlacementGuide id={compact?"lesson-pip":"lesson"} focused points={facePoints} areas={stepAreas(currentLesson)} technique={currentLesson.technique} shape={shape} blueprint={faceBlueprint} aspect={photoAspect} displayAspect={compact?undefined:lessonDisplayAspect} stepNumber={step+1} paused={!guideMotion}/>
       {!compact&&<button className="guide-motion-toggle" aria-pressed={!guideMotion} onClick={()=>setGuideMotion(value=>!value)}>{guideMotion?"Ⅱ Pause arrows":"▶ Animate arrows"}</button>}
     </div>;
